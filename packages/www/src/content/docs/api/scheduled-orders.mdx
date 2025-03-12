@@ -1,0 +1,344 @@
+---
+title: Scheduled Coffee Orders
+---
+
+# Scheduling Automated Coffee Orders
+
+This guide demonstrates how to set up recurring coffee orders using the Terminal API and system schedulers. By implementing these steps, you can have your favorite coffee automatically ordered and delivered on a schedule that works for you.
+
+## Prerequisites
+
+Before setting up scheduled orders, you'll need:
+
+- A Terminal account with saved payment method
+- Your API key (found in your account settings)
+- Basic command line knowledge
+- Curl or another HTTP client
+
+:::tip[Authentication]
+Remember to keep your API key secure and never expose it in public repositories or shared environments.
+:::
+
+## API Overview
+
+The Terminal API provides an endpoint for creating orders:
+
+```
+POST https://api.terminal.com/order
+```
+
+### Request Format
+
+```json
+{
+  "variants": {
+    "var_coffee_darkroast_12oz": 1,
+    "var_coffee_lightroast_8oz": 2
+  },
+  "addressID": "addr_1234567890",
+  "cardID": "card_1234567890"
+}
+```
+
+Where:
+- `variants`: Record of product variant IDs and their quantities
+- `addressID`: ID of the shipping address to use
+- `cardID`: ID of the payment card to use
+
+### Response Format
+
+```json
+{
+  "id": "ord_1234567890"
+}
+```
+
+The API returns the order ID on successful creation, which you can use to check the status with `GET /order/:id`.
+
+:::note[API Documentation]
+For detailed API documentation, including all available parameters, refer to the [API Reference](/docs/api/index).
+:::
+
+## Setting Up Scheduled Orders
+
+### MacOS/Linux using Cron
+
+On MacOS and Linux systems, you can use the built-in cron scheduler:
+
+1. Open your terminal
+2. Edit your crontab file:
+   ```bash
+   crontab -e
+   ```
+
+3. Add a cron job that runs at your desired schedule. For example, to order coffee every Monday at 8 AM:
+   ```
+   0 8 * * 1 /usr/bin/curl -X POST "https://api.terminal.com/order" -H "Authorization: Bearer YOUR_API_KEY" -H "Content-Type: application/json" -d '{"variants":{"var_coffee_darkroast_12oz":1},"addressID":"addr_YOUR_ADDRESS_ID","cardID":"card_YOUR_CARD_ID"}' >> /path/to/coffee_order_log.txt 2>&1
+   ```
+
+4. Save and close the editor
+
+:::caution[API Keys in Crontab]
+Storing API keys directly in the crontab is not the most secure approach. Consider using environment variables or a secure key storage solution in production environments.
+:::
+
+### MacOS using LaunchAgents
+
+For more advanced scheduling on MacOS:
+
+1. Create a script file named `order_coffee.sh`:
+   ```bash
+   #!/bin/bash
+   
+   TERMINAL_API_KEY="YOUR_API_KEY"
+   
+   curl -X POST "https://api.terminal.com/order" \
+     -H "Authorization: Bearer $TERMINAL_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "variants": {
+         "var_coffee_darkroast_12oz": 1
+       },
+       "addressID": "addr_YOUR_ADDRESS_ID",
+       "cardID": "card_YOUR_CARD_ID"
+     }'
+   ```
+
+2. Make the script executable:
+   ```bash
+   chmod +x order_coffee.sh
+   ```
+
+3. Create a LaunchAgent plist file at `~/Library/LaunchAgents/com.user.coffeeorder.plist`:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+       <key>Label</key>
+       <string>com.user.coffeeorder</string>
+       <key>ProgramArguments</key>
+       <array>
+           <string>/path/to/order_coffee.sh</string>
+       </array>
+       <key>StartCalendarInterval</key>
+       <dict>
+           <key>Hour</key>
+           <integer>8</integer>
+           <key>Minute</key>
+           <integer>0</integer>
+           <key>Weekday</key>
+           <integer>1</integer>
+       </dict>
+       <key>StandardErrorPath</key>
+       <string>/path/to/logs/coffee_error.log</string>
+       <key>StandardOutPath</key>
+       <string>/path/to/logs/coffee_output.log</string>
+   </dict>
+   </plist>
+   ```
+
+4. Load the LaunchAgent:
+   ```bash
+   launchctl load ~/Library/LaunchAgents/com.user.coffeeorder.plist
+   ```
+
+### Windows using Task Scheduler
+
+On Windows systems, you can use the built-in Task Scheduler:
+
+1. Create a PowerShell script named `OrderCoffee.ps1`:
+   ```powershell
+   $apiKey = "YOUR_API_KEY"
+   $headers = @{
+       "Authorization" = "Bearer $apiKey"
+       "Content-Type" = "application/json"
+   }
+   
+   $body = @{
+       "variants" = @{
+           "var_coffee_darkroast_12oz" = 1
+       }
+       "addressID" = "addr_YOUR_ADDRESS_ID"
+       "cardID" = "card_YOUR_CARD_ID"
+   } | ConvertTo-Json
+   
+   Invoke-RestMethod -Uri "https://api.terminal.com/order" -Method Post -Headers $headers -Body $body -ContentType "application/json"
+   ```
+
+2. Open Task Scheduler:
+   - Start → Search → "Task Scheduler"
+
+3. Create a new task:
+   - Action → Create Task
+   - General: Name it "Coffee Order"
+   - Triggers: New → Weekly → Select Monday → 8:00 AM
+   - Actions: New → Start a program
+     - Program/script: `powershell.exe`
+     - Add arguments: `-ExecutionPolicy Bypass -File "C:\path\to\OrderCoffee.ps1"`
+   - Click OK to save
+
+## Using Docker Containers
+
+For a platform-independent solution, you can use Docker:
+
+1. Create a `Dockerfile`:
+   ```dockerfile
+   FROM alpine:latest
+   
+   RUN apk add --no-cache curl
+   
+   COPY order_script.sh /order_script.sh
+   RUN chmod +x /order_script.sh
+   
+   # Use cron in container
+   RUN apk add --no-cache dcron
+   COPY coffee-cron /etc/crontabs/root
+   
+   CMD ["crond", "-f", "-d", "8"]
+   ```
+
+2. Create a cron file named `coffee-cron`:
+   ```
+   # min hour day month weekday command
+   0 8 * * 1 /order_script.sh
+   ```
+
+3. Create the order script:
+   ```bash
+   #!/bin/sh
+   
+   curl -X POST "https://api.terminal.com/order" \
+     -H "Authorization: Bearer $TERMINAL_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "variants": {
+         "var_coffee_darkroast_12oz": 1
+       },
+       "addressID": "'"$ADDRESS_ID"'",
+       "cardID": "'"$CARD_ID"'"
+     }'
+   ```
+
+4. Build and run the container:
+   ```bash
+   docker build -t coffee-scheduler .
+   docker run -e TERMINAL_API_KEY="YOUR_API_KEY" \
+     -e ADDRESS_ID="addr_YOUR_ADDRESS_ID" \
+     -e CARD_ID="card_YOUR_CARD_ID" \
+     coffee-scheduler
+   ```
+
+## Advanced Configuration
+
+### Variable Order Parameters
+
+You can extend your scripts to vary order parameters based on the date or other factors:
+
+```bash
+#!/bin/bash
+
+# Determine the day of the week (0-6, with 0 being Sunday)
+DAY_OF_WEEK=$(date +%u)
+
+# Select different coffee based on the day
+case $DAY_OF_WEEK in
+  1) VARIANT_ID="var_coffee_darkroast_12oz" ;;  # Monday: Dark Roast
+  3) VARIANT_ID="var_coffee_espresso_12oz" ;;   # Wednesday: Espresso
+  5) VARIANT_ID="var_coffee_coldbrew_12oz" ;;   # Friday: Cold Brew
+  *) VARIANT_ID="var_coffee_mediumroast_12oz" ;; # Other days: Medium Roast
+esac
+
+# Make the API call with the selected product
+curl -X POST "https://api.terminal.com/order" \
+  -H "Authorization: Bearer $TERMINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"variants\": {
+      \"$VARIANT_ID\": 1
+    },
+    \"addressID\": \"addr_YOUR_ADDRESS_ID\",
+    \"cardID\": \"card_YOUR_CARD_ID\"
+  }"
+```
+
+### Handling Failures and Notifications
+
+For more robust scheduled orders, implement error handling and notifications:
+
+```bash
+#!/bin/bash
+
+# Order coffee
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.terminal.com/order" \
+  -H "Authorization: Bearer $TERMINAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "variants": {
+      "var_coffee_darkroast_12oz": 1
+    },
+    "addressID": "addr_YOUR_ADDRESS_ID",
+    "cardID": "card_YOUR_CARD_ID"
+  }')
+
+# Extract HTTP status
+HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+BODY=$(echo "$RESPONSE" | sed '$ d')
+
+# Check if request was successful
+if [ $HTTP_STATUS -ge 200 ] && [ $HTTP_STATUS -lt 300 ]; then
+  echo "Coffee ordered successfully!"
+  # Extract order ID for tracking
+  ORDER_ID=$(echo "$BODY" | jq -r '.id')
+  
+  # Send success notification (assuming a notifications endpoint exists)
+  curl -X POST "https://api.terminal.com/notification" \
+    -H "Authorization: Bearer $TERMINAL_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"message\": \"Coffee ordered! Order ID: $ORDER_ID\"}"
+else
+  echo "Failed to order coffee. Status: $HTTP_STATUS"
+  echo "Response: $BODY"
+  
+  # Send failure notification
+  curl -X POST "https://api.terminal.com/notification" \
+    -H "Authorization: Bearer $TERMINAL_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "{\"message\": \"Failed to order coffee. Status: $HTTP_STATUS\"}"
+fi
+```
+
+## Security Considerations
+
+When setting up automated API calls:
+
+1. **API Key Storage**:
+   - Store API keys in environment variables
+   - Consider using a secrets manager like HashiCorp Vault or AWS Secrets Manager
+   - Never hardcode API keys in scripts committed to version control
+
+2. **Request Auditing**:
+   - Log all automated API calls
+   - Implement alerting for suspicious or failed requests
+   - Regularly review logs for unexpected behavior
+
+3. **Access Control**:
+   - Use API keys with the minimum necessary permissions
+   - Consider creating specific API keys for automated tasks
+   - Rotate API keys periodically
+
+:::danger[Important Security Note]
+The examples in this guide are for educational purposes. In production environments, always implement proper security measures for storing and handling API keys.
+:::
+
+## Troubleshooting
+
+If your scheduled orders aren't working:
+
+- Verify your API key is valid and has sufficient permissions
+- Check system logs for scheduler or script execution errors
+- Ensure your payment method and address IDs are current
+- Test the API call manually before scheduling
+- Verify your scheduler service is running (cron, Task Scheduler, etc.)
+
+For specific error codes and troubleshooting, refer to our [API Error Reference](/docs/api/index#errors).

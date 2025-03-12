@@ -1,0 +1,141 @@
+---
+title: SSH Overview
+---
+
+# SSH Overview
+
+Secure Shell (SSH) is a cryptographic network protocol that enables secure communications over an unsecured network. This document provides a high-level overview of SSH and how Terminal implements it.
+
+## What is SSH?
+
+SSH creates an encrypted channel for:
+- Remote command-line access
+- Secure file transfers
+- Port forwarding
+- Network tunneling
+
+:::note[Historical Context]
+SSH was designed as a secure replacement for unencrypted protocols like Telnet, rlogin, and FTP.
+:::
+
+## How SSH Works
+
+SSH operates on a client-server model with these key components:
+
+### 1. Authentication
+
+SSH verifies identities through several methods:
+
+```
+Client                 Server
+  |                      |
+  |---- Connection ----->|
+  |<--- Key Exchange --->|
+  |<--- Authentication -->|
+  |<---- Session ------->|
+```
+
+- **Public key authentication**: Uses cryptographic key pairs
+- **Keyboard-interactive**: Challenge-response mechanism
+- **Host-based**: Verifies client host identity
+
+### 2. Encryption
+
+SSH encrypts all traffic using:
+
+- **Symmetric encryption**: For session data (AES, ChaCha20)
+- **Asymmetric encryption**: For key exchange (RSA, ED25519)
+- **Hashing**: For data integrity (SHA-256)
+
+### 3. Connection Process
+
+:::vhs-png[SSH Connection Process]
+Type "ssh terminal.com"
+Sleep 1s
+Type "Authenticating..."
+Sleep 1s
+Type "Connected!"
+Sleep 1s
+:::
+
+1. **TCP Connection**: Client connects to server (default port 22)
+2. **Protocol Negotiation**: Agree on SSH version
+3. **Key Exchange**: Generate shared secret
+4. **Authentication**: Verify client identity
+5. **Channel Establishment**: Create encrypted communication channels
+
+## Terminal's SSH Implementation
+
+Terminal provides SSH access through a custom implementation:
+
+- Built on Go using the Charm Wish SSH server library
+- Uses ED25519 cryptographic keys for enhanced security
+- Runs on AWS infrastructure with auto-scaling capabilities
+- Provides a Terminal User Interface (TUI) for rich interaction
+
+### Architecture
+
+```
+┌─────────────┐       ┌─────────────┐       ┌─────────────┐
+│  SSH Client  │──────▶│ Load Balancer│──────▶│  SSH Server │
+└─────────────┘       └─────────────┘       └─────────────┘
+                                                   │
+                                                   ▼
+                                            ┌─────────────┐
+                                            │  Terminal UI │
+                                            └─────────────┘
+                                                   │
+                                                   ▼
+                                            ┌─────────────┐
+                                            │     API     │
+                                            └─────────────┘
+```
+
+## Common Use Cases
+
+SSH enables several key workflows:
+
+1. **Remote Administration**
+   - Access servers from anywhere
+   - Run system commands securely
+
+2. **Secure File Transfers**
+   - SFTP (SSH File Transfer Protocol)
+   - SCP (Secure Copy Protocol)
+
+3. **Port Forwarding**
+   - Local port forwarding
+   - Remote port forwarding
+   - Dynamic forwarding (SOCKS proxy)
+
+4. **SSH Tunneling**
+   - Secure access to services behind firewalls
+   - Bypass network restrictions
+
+## SSH vs. Other Protocols
+
+| Protocol | Security | Authentication | Encryption | Use Case |
+|----------|----------|---------------|------------|----------|
+| SSH      | High     | Multiple methods | End-to-end | Command-line, SFTP |
+| HTTPS    | High     | Certificates  | TLS        | Web traffic |
+| Telnet   | None     | Basic         | None       | (Obsolete) |
+| FTP      | Low      | Basic         | None       | (Legacy file transfer) |
+
+## Getting Started
+
+To connect to Terminal via SSH:
+
+1. Generate an SSH key (if you don't have one)
+2. Add your public key to Terminal
+3. Connect using `ssh terminal.com`
+
+:::tip[Quick Setup]
+See our [SSH Security Best Practices](/docs/ssh-security) guide for detailed setup instructions.
+:::
+
+## Advanced Topics
+
+- **SSH Agents**: Manage keys securely in memory
+- **SSH Config**: Custom configuration for different hosts
+- **SSH Certificates**: Centrally managed authentication
+- **SSH Jump Hosts**: Access restricted networks

@@ -1,0 +1,174 @@
+---
+title: Ordering Coffee via SSH
+---
+
+# Getting Started: Coffee via SSH
+
+Terminal's SSH interface provides a convenient way to order coffee directly from your command line. This guide will walk you through the process from connection to checkout.
+
+## Prerequisites
+
+Before you begin, you'll need:
+
+- An SSH client installed on your system
+- A Terminal account
+- Your SSH key added to your Terminal account
+
+:::tip[New to SSH?]
+Check out our [SSH Overview](/docs/ssh-overview) if you're new to SSH or need a refresher.
+:::
+
+## Connecting to the Terminal Coffee Shop
+
+Connect to our SSH server using:
+
+```bash
+ssh terminal.com
+```
+
+:::vhs-png[SSH Connection]
+Type "ssh terminal.com"
+Sleep 1s
+Type "Welcome to Terminal Coffee Shop!"
+Sleep 2s
+:::
+
+## Navigating the Coffee Menu
+
+Once connected, you'll see the Terminal UI interface. Here's how to navigate:
+
+1. Use arrow keys (`↑` `↓`) to move between menu options
+2. Press `Enter` to select an option
+3. Press `Esc` to go back to the previous menu
+
+### Main Menu Options
+
+- **Shop**: Browse coffee products
+- **Cart**: View your current selections
+- **Account**: Manage your account settings
+- **Orders**: View order history
+- **Help**: Access documentation
+
+## Browsing Coffee Products
+
+To browse our coffee selection:
+
+1. Select **Shop** from the main menu
+2. Navigate through categories using arrow keys
+3. Select a product to view details
+4. Press `+` to add items to your cart
+
+:::vhs-png[Browsing Coffee]
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type "l"
+Sleep 1s
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type "l"
+Sleep 1s
+Type "+"
+Sleep 1s
+:::
+
+## Managing Your Cart
+
+To view and modify your cart:
+
+1. Navigate to **Cart** from the main menu
+2. Use arrow keys to select items
+3. Press `+` to increase quantity
+4. Press `-` to decrease quantity
+5. Press `x` to remove an item
+6. Press `c` to continue to checkout
+
+## Adding Payment Methods
+
+You can add payment methods through either SSH or HTTPS:
+
+### Via SSH
+
+1. Navigate to **Account** in the main menu
+2. Select **Payment Methods**
+3. Choose **Add New Card**
+4. Enter your card details when prompted
+
+:::caution[Secure Input]
+Your payment information is encrypted end-to-end and never stored in plain text.
+:::
+
+### Via HTTPS
+
+You can also manage payment methods through our web interface:
+
+1. Visit [https://terminal.com/account/payments](https://terminal.com/account/payments)
+2. Log in to your account
+3. Click **Add Payment Method**
+4. Fill in the form and submit
+
+:::tip[Multiple Payment Methods]
+Add multiple payment methods to quickly switch between them at checkout.
+:::
+
+## Completing Your Order
+
+To finalize your coffee purchase:
+
+1. Navigate to your cart
+2. Press `c` to proceed to checkout
+3. Select delivery or pickup options
+4. Choose a payment method
+5. Review your order
+6. Confirm purchase
+
+:::vhs-png[Checkout Process]
+Type "c"
+Sleep 1s
+Type "j"
+Sleep 500ms
+Type "Enter"
+Sleep 1s
+Type "j"
+Sleep 500ms
+Type "j"
+Sleep 500ms
+Type "Enter"
+Sleep 2s
+Type "Thank you for your order!"
+Sleep 1s
+:::
+
+## Order Tracking
+
+After placing an order, you can track its status:
+
+1. Select **Orders** from the main menu
+2. Choose the order you wish to track
+3. View real-time status updates
+
+Order status will change from:
+- **Processing** → **Brewing** → **Out for Delivery** → **Delivered**
+
+## Tips and Tricks
+
+- **Quick Navigation**: Press `h` to return home, `q` to quit
+- **Search**: Press `/` followed by search terms to find products
+- **Favorites**: Press `f` when viewing a product to add it to favorites
+- **Reorder**: In the orders menu, press `r` on a past order to quickly reorder
+
+## Troubleshooting
+
+If you encounter issues during the ordering process:
+
+- Check your SSH connection with `ssh -v terminal.com`
+- Ensure your payment method is valid
+- Verify your delivery address is complete
+- Contact support via `support@terminal.com` or within the app by pressing `?`
+
+:::note[SSH Session Timeout]
+Your SSH session will timeout after 30 minutes of inactivity. Any unsaved cart items will be preserved for your next session.
+:::

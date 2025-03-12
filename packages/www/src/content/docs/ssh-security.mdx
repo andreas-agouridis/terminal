@@ -1,0 +1,98 @@
+---
+title: SSH Security Best Practices
+---
+
+# SSH Security Best Practices
+
+Secure Shell (SSH) is a critical component of our infrastructure that allows secure remote access to systems. This guide outlines best practices for securely using SSH with Terminal.
+
+## Key Authentication
+
+:::tip[Use ED25519 Keys]
+We recommend using ED25519 keys for authentication as they provide strong security with shorter key lengths.
+:::
+
+```bash
+# Generate a new ED25519 key pair
+ssh-keygen -t ed25519 -C "you@example.com"
+```
+
+### Key Management
+
+- **Never share private keys** between users or devices
+- Store private keys in secure locations with proper permissions (`chmod 600`)
+- Use a passphrase for additional protection of private keys
+- Consider using ssh-agent for convenient but secure key handling
+
+## Authentication Methods
+
+Terminal supports multiple authentication methods:
+
+1. **Public Key Authentication** (preferred)
+2. **Keyboard-Interactive** (fallback)
+
+:::caution[Avoid Password Auth]
+Disable password authentication when possible as it's vulnerable to brute force attacks.
+:::
+
+## Secure Configuration
+
+When connecting to our SSH service, ensure your client configuration follows these guidelines:
+
+```bash
+# Add to ~/.ssh/config
+Host terminal
+    HostName ssh.terminal.com
+    User your-username
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    HashKnownHosts yes
+    StrictHostKeyChecking yes
+```
+
+### Connection Hardening
+
+- **Keep clients updated** with security patches
+- **Limit connection attempts** to prevent brute force attacks
+- **Use strong algorithms** for encryption and key exchange
+
+## Fingerprint Verification
+
+Always verify SSH fingerprints on first connection:
+
+:::vhs-png[SSH Fingerprint Verification]
+Type "ssh terminal.com"
+Sleep 1s
+Type "yes"
+Sleep 1s
+:::
+
+The fingerprint should match the one displayed in your dashboard.
+
+## Access Control
+
+- Grant minimum necessary privileges to users
+- Regularly audit SSH access
+- Remove unused or outdated access keys promptly
+
+## Incident Response
+
+If you suspect your SSH keys have been compromised:
+
+1. Generate new SSH key pairs
+2. Remove the old keys from authorized systems
+3. Contact support to invalidate any active sessions
+4. Review access logs for suspicious activity
+
+:::danger[Security Breaches]
+Report suspected security incidents immediately to security@terminal.com
+:::
+
+## Advanced Security Measures
+
+For high-security environments, consider these additional measures:
+
+- SSH certificate authority (CA) for managing access
+- Hardware security keys (like YubiKey) for key storage
+- Just-in-time (JIT) SSH access provisioning
+- Comprehensive logging and monitoring
