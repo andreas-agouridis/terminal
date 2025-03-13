@@ -74,11 +74,6 @@ declare module "sst" {
       "type": "sst.aws.Function"
       "url": string
     }
-    "OpenControl": {
-      "name": string
-      "type": "sst.aws.Function"
-      "url": string
-    }
     "SSH": {
       "service": string
       "type": "sst.aws.Service"

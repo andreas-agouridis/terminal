@@ -1,7 +1,6 @@
 import { describe, expect } from "bun:test";
 import { setupApiTest } from "./util";
 import { Api } from "@terminal/core/api/api";
-import { Examples } from "@terminal/core/examples";
 
 const { test, validateOpenAPIRoute } = setupApiTest();
 
@@ -47,4 +46,3 @@ describe("token", () => {
     expect(deletedToken).toBeUndefined();
   });
 });
-

@@ -74,6 +74,14 @@ export module Examples {
     productVariantID: CartItem.productVariantID,
   };
 
+  export const GiftCard = {
+    id: Id("giftCard"),
+    orderID: Id("order"),
+    value: 3200,
+    balance: 3200,
+    recipientEmail: "test@example.com",
+  };
+
   export const Order = {
     id: Id("order"),
     index: 0,

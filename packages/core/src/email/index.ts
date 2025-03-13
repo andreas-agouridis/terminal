@@ -9,6 +9,7 @@ export namespace Email {
     to: string,
     subject: string,
     body: string,
+    cc?: string,
   ) {
     from = from + "@" + Resource.ShortDomainEmail.sender;
     console.log("sending email", subject, from, to);
@@ -16,6 +17,7 @@ export namespace Email {
       new SendEmailCommand({
         Destination: {
           ToAddresses: [to],
+          CcAddresses: cc ? [cc] : [],
         },
         Content: {
           Simple: {

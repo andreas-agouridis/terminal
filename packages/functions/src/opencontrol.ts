@@ -7,6 +7,7 @@ import { db } from "@terminal/core/drizzle/index";
 import { Inventory } from "@terminal/core/inventory/index";
 import { Resource } from "sst";
 import { tools } from "sst/opencontrol";
+import { GiftCard } from "@terminal/core/giftcard/index";
 
 const database = tool({
   name: "database_query_readonly",
@@ -27,6 +28,16 @@ const inventory = tool({
   args: Inventory.record.schema,
   async run(input) {
     return Inventory.record(input);
+  },
+});
+
+const giftcard = tool({
+  name: "giftcard_create",
+  description:
+    "Create a new gift card. The `value` argument is in cents (USD).",
+  args: GiftCard.create.schema,
+  async run(input) {
+    return GiftCard.create(input);
   },
 });
 
@@ -93,7 +104,7 @@ export const terminal = [
 
 const app = create({
   key: process.env.OPENCONTROL_KEY,
-  tools: [database, inventory, stripe, ...terminal, ...tools],
+  tools: [database, inventory, giftcard, stripe, ...terminal, ...tools],
 });
 
 export const handler = handle(app);

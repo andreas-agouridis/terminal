@@ -1149,6 +1149,7 @@ export class SchemaValidator {
 
               // Generate a valid request body
               const validBody = this.generateSampleData(resolvedSchema);
+              console.debug("validBody", validBody);
 
               // Find a required field to remove
               if (
@@ -1165,7 +1166,7 @@ export class SchemaValidator {
                 }
               }
 
-              return validBody;
+              return undefined;
             }
           }
         } catch (error) {
@@ -1208,7 +1209,7 @@ export class SchemaValidator {
             }
           }
 
-          return validBody;
+          return undefined;
         }
       }
     }
@@ -1247,7 +1248,7 @@ export class SchemaValidator {
           }
         }
 
-        return validBody;
+        return undefined;
       }
     }
 

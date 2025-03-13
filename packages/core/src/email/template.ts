@@ -90,27 +90,32 @@ export module Template {
           value: giftCardTable.value,
           recipientEmail: giftCardTable.recipientEmail,
           orderID: giftCardTable.orderID,
-          email: orderTable.email, // purchaser's email
+          purchaserName: userTable.name,
+          purchaserEmail: orderTable.email,
         })
         .from(giftCardTable)
         .leftJoin(orderTable, eq(giftCardTable.orderID, orderTable.id))
+        .leftJoin(userTable, eq(orderTable.userID, userTable.id))
         .where(eq(giftCardTable.id, giftCardID))
         .then((rows) => rows[0]),
     );
 
-    if (!giftCard || !giftCard.recipientEmail) return;
+    if (!giftCard || !giftCard.recipientEmail) {
+      console.log("No gift card found for ID", giftCardID);
+      return;
+    }
 
     const dollarValue = (giftCard.value / 100).toFixed(2);
     const body = [
       `Hello from Terminal!`,
       ``,
-      `You've received a $${dollarValue} gift card to use at Terminal.`,
+      `${giftCard.purchaserName ? `${giftCard.purchaserName} sent you` : "You've received"} a $${dollarValue} gift card to use at Terminal.`,
       ``,
       `Gift Card Code: ${giftCard.id}`,
       `Amount: $${dollarValue}`,
       ``,
       `To redeem your gift card, simply enter this code during checkout at our Terminal shop.`,
-      `You can access the Terminal shop via SSH: ssh terminal.shop`,
+      "You can access the Terminal shop via SSH: `ssh terminal.shop` and if that's confusing, visit https://terminal.shop/docs.",
       ``,
       `Enjoy!`,
       `The Terminal Team`,
@@ -123,6 +128,7 @@ export module Template {
       giftCard.recipientEmail,
       `Your Terminal Gift Card`,
       body,
+      giftCard.purchaserEmail || undefined,
     );
   }
 }

@@ -5,8 +5,6 @@ import {
   getTestProductVariantID,
   setupApiTest,
 } from "./util";
-import { Address } from "@terminal/core/address/index";
-import { Card } from "@terminal/core/card/index";
 import { Order } from "@terminal/core/order/order";
 
 const { test, validateOpenAPIRoute } = setupApiTest();

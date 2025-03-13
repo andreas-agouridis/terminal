@@ -46,7 +46,7 @@ func (m model) ConfirmUpdate(msg tea.Msg) (model, tea.Cmd) {
 					}
 					return subscription
 				} else {
-					order, err := m.client.Cart.Convert(m.context)
+					order, err := m.client.Cart.Convert(m.context, terminal.CartConvertParams{})
 					if err != nil {
 						return VisibleError{
 							message: api.GetErrorMessage(err),

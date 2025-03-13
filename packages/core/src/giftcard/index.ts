@@ -9,16 +9,31 @@ import { bus } from "sst/aws/bus";
 import { Resource } from "sst";
 import { afterTx } from "../drizzle/transaction";
 import { VisibleError, ErrorCodes } from "../error";
+import { Common } from "../common";
+import { Examples } from "../examples";
 
 export module GiftCard {
   export const Info = z.object({
-    id: z.string(),
-    orderID: z.string(),
-    value: z.number(),
-    balance: z.number(),
-    recipientEmail: z.string().email(),
-    timeCreated: z.date(),
-    timeUpdated: z.date(),
+    id: z.string().openapi({
+      description: Common.IdDescription,
+      example: Examples.GiftCard.id,
+    }),
+    orderID: z.string().optional().openapi({
+      description: "ID of the order that purchased the gift card.",
+      example: Examples.GiftCard.orderID,
+    }),
+    value: z.number().openapi({
+      description: "Value of the gift card in cents (USD).",
+      example: Examples.GiftCard.value,
+    }),
+    balance: z.number().openapi({
+      description: "Remaining balance of the gift card in cents (USD).",
+      example: Examples.GiftCard.balance,
+    }),
+    recipientEmail: z.string().email().openapi({
+      description: "Email address of the recipient of the gift card.",
+      example: Examples.GiftCard.recipientEmail,
+    }),
   });
 
   export type Info = z.infer<typeof Info>;
@@ -34,9 +49,9 @@ export module GiftCard {
 
   export const create = fn(
     z.object({
-      orderID: z.string(),
       value: z.number(),
       recipientEmail: z.string().email(),
+      orderID: z.string().optional(),
     }),
     async (input) => {
       return useTransaction(async (tx) => {
@@ -105,13 +120,10 @@ export module GiftCard {
   ): z.infer<typeof Info> {
     return {
       id: input.id,
-      orderID: input.orderID,
+      orderID: input.orderID || undefined,
       value: input.value,
       balance: input.balance,
       recipientEmail: input.recipientEmail,
-      timeCreated: input.timeCreated!,
-      timeUpdated: input.timeUpdated!,
     };
   }
 }
-

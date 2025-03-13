@@ -1,0 +1,1 @@
+ALTER TABLE `gift_card` MODIFY COLUMN `order_id` char(30);

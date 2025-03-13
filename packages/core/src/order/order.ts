@@ -325,7 +325,7 @@ export module Order {
       );
 
       // Check if any of the items is a gift card
-      const hasGiftCard = items.some((item) => item.tags.type === "giftcard");
+      const hasGiftCard = items.some((item) => item.tags.giftcard);
 
       // If there's a gift card in the cart, recipient email is required
       if (hasGiftCard && !input.recipientEmail) {
@@ -453,7 +453,7 @@ export module Order {
             });
 
             // If this item is a gift card, create a gift card entry for each quantity
-            if (item.tags.type === "giftcard" && input.recipientEmail) {
+            if (item.tags.giftcard && input.recipientEmail) {
               for (let i = 0; i < item.quantity; i++) {
                 await GiftCard.create({
                   orderID,

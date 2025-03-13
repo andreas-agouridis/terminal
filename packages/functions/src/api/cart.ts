@@ -173,18 +173,6 @@ export module CartApi {
         tags: ["Cart"],
         summary: "Convert to order",
         description: "Convert the current user's cart to an order.",
-        requestBody: {
-          content: {
-            "application/json": {
-              schema: z.object({
-                recipientEmail: z.string().email().optional().openapi({
-                  description:
-                    "Email address for gift card recipient (required if cart contains gift cards)",
-                }),
-              }),
-            },
-          },
-        },
         responses: {
           200: {
             content: {
@@ -226,18 +214,6 @@ export module CartApi {
         tags: ["Cart"],
         summary: "Redeem gift card",
         description: "Apply a gift card to the current user's cart.",
-        requestBody: {
-          content: {
-            "application/json": {
-              schema: z.object({
-                giftCardID: z.string().openapi({
-                  description: "ID of the gift card to apply to the cart",
-                  example: "gft_01HXXXXXXXXXXXX",
-                }),
-              }),
-            },
-          },
-        },
         responses: {
           200: {
             content: {

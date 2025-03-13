@@ -7,8 +7,6 @@ import {
   setupApiTest,
 } from "./util";
 import { Examples } from "@terminal/core/examples";
-import { Address } from "@terminal/core/address/index";
-import { Card } from "@terminal/core/card/index";
 import { Cart } from "@terminal/core/cart/index";
 import { GiftCard } from "@terminal/core/giftcard/index";
 

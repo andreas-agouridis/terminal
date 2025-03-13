@@ -72,8 +72,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/stripe/stripe-go/v78 v78.2.0 h1:jyyWXG+H9J97I0f0XnEVn8eisbXz0D7m57aJMdIJ9aE=
 github.com/stripe/stripe-go/v78 v78.2.0/go.mod h1:GjncxVLUc1xoIOidFqVwq+y3pYiG7JLVWiVQxTsLrvQ=
-github.com/terminaldotshop/terminal-sdk-go v1.0.0 h1:2+EskHIBy5PPswGim2pbF1tYZ2ZPD+4p2xaECf8tjkY=
-github.com/terminaldotshop/terminal-sdk-go v1.0.0/go.mod h1:0HH2MBKVAleDSm9uv2cQw+vVKvXRUC5xOkeHW70cHRs=
+github.com/terminaldotshop/terminal-sdk-go v1.1.0 h1:KccgdJqk72g925rvAB0gXUV/VKoRHT1Mz5rlFtPK8XE=
+github.com/terminaldotshop/terminal-sdk-go v1.1.0/go.mod h1:28WE2YTqRVLNDpZFiPm4ny3f1hjJuJkf0e2Jwy5Gxys=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.17.1 h1:wlYEnwqAHgzmhNUFfw7Xalt2JzQvsMx2Se4PcoFCT/U=
 github.com/tidwall/gjson v1.17.1/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=

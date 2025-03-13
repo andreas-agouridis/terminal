@@ -13,7 +13,7 @@ require (
 	github.com/foize/go.sgr v0.0.0-20140220094842-40bdfc98040c
 	github.com/google/uuid v1.6.0
 	github.com/stripe/stripe-go/v78 v78.2.0
-	github.com/terminaldotshop/terminal-sdk-go v1.0.0
+	github.com/terminaldotshop/terminal-sdk-go v1.1.0
 	golang.org/x/crypto v0.21.0
 	rsc.io/qr v0.2.0
 )
