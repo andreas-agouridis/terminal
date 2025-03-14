@@ -3,14 +3,27 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@lib/*": ["lib/*"],
-      "@layouts/*": ["src/layouts/*"],
-      "@components/*": ["src/components/*"],
-      "@styles/*": ["src/styles/*"],
-      "@terminal/functions/*": ["../functions/src/*"]
+      "@lib/*": [
+        "lib/*"
+      ],
+      "@layouts/*": [
+        "src/layouts/*"
+      ],
+      "@components/*": [
+        "src/components/*"
+      ],
+      "@styles/*": [
+        "src/styles/*"
+      ],
+      "@terminal/functions/*": [
+        "../functions/src/*"
+      ]
     },
     "jsx": "preserve",
     "jsxImportSource": "solid-js"
   },
-  "exclude": ["dist"]
+  "exclude": [
+    "dist",
+    "src/cui"
+  ]
 }

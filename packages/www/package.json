@@ -8,16 +8,18 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "format": "prettier --write --plugin-search-dir=. ."
+    "format": "prettier --write --plugin-search-dir=. .",
+    "typecheck": "astro check"
   },
   "keywords": [],
   "author": "@terminaldotshop",
   "license": "MIT",
   "devDependencies": {
+    "@astrojs/check": "0.9.4",
     "@types/node": "^20.12.6",
     "@types/react": "19.0.8",
-    "tailwindcss": "^3.4.3",
-    "prettier-plugin-astro": "0.13.0"
+    "prettier-plugin-astro": "0.13.0",
+    "tailwindcss": "^3.4.3"
   },
   "dependencies": {
     "@astrojs/mdx": "3.1.9",
@@ -25,6 +27,7 @@
     "@astrojs/react": "4.2.0",
     "@astrojs/solid-js": "4.4.1",
     "@astrojs/tailwind": "^5.1.0",
+    "@kobalte/core": "0.13.9",
     "@modular-forms/solid": "0.25.0",
     "@openauthjs/openauth": "*",
     "@scalar/openapi-parser": "0.10.8",

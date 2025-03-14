@@ -25,6 +25,7 @@ const tweets = [
 
 // @ts-ignore
 const randomTweet = tweets[Math.floor(Math.random() * tweets.length)]
+console.debug(randomTweet)
 return Astro.redirect(
   `https://x.com/intent/tweet?text=${encodeURIComponent(randomTweet)}`,
 )

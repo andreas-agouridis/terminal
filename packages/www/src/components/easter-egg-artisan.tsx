@@ -6,7 +6,8 @@ import {
   Show,
   type ParentComponent,
 } from 'solid-js'
-import Line, { type State } from '@components/line'
+import type { State } from 'src/types'
+import Line from '@components/line'
 import Caret from './caret'
 
 type EasterEggArtisanProps = {} & JSX.HTMLAttributes<HTMLDivElement>

@@ -31,7 +31,7 @@ const InputComponent: Component<InputProps> = (props) => {
   const [before, setBefore] = createSignal<string>()
   const [after, setAfter] = createSignal<string>()
   const [blink, setBlink] = createSignal<boolean>(true)
-  const [internalValue, setInternalValue] = createSignal<string>()
+  const [, setInternalValue] = createSignal<string>()
 
   let blinkTimeout: ReturnType<typeof setTimeout> | undefined = undefined
 
@@ -134,7 +134,7 @@ const InputComponent: Component<InputProps> = (props) => {
         onKeyPress={submit}
         onChange={onChange}
         onBlur={onBlur}
-        // onKeyDown={update}
+      // onKeyDown={update}
       />
       <Show when={props.state !== 'normal'}>
         <span class="text-white leading-10 flex gap-2 flex-wrap self-center">

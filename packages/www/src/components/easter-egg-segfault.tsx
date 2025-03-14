@@ -5,7 +5,8 @@ import {
   type ParentProps,
   Show,
 } from 'solid-js'
-import Line, { type State } from '@components/line'
+import type { State } from 'src/types'
+import Line from '@components/line'
 import Editor from '@components/editor'
 import Caret from './caret'
 
