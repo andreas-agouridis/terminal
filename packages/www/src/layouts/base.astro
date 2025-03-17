@@ -20,7 +20,7 @@ const links = [
   { href: '/about', text: 'readme', active: false },
   // { href: '/cron', text: 'cron.md', active: false },
   // { href: '/docs', text: 'docs', active: false },
-  { href: '/api/reference', text: 'api', active: false },
+  { href: '/api', text: 'api', active: false },
   { href: '/faq', text: 'faq', active: false },
 ]
 
@@ -61,7 +61,6 @@ if (current) current.active = true
     <meta property="auth-url" content={Resource.Auth.url} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="stylesheet" href="/css/prism.css" />
     <style>
       @font-face {
         font-family: 'geist';

@@ -15,12 +15,12 @@ const LineComponent: Component<LineProps> = (props) => {
       component={props.href ? 'a' : 'div'}
       tabindex="0"
       href={props.href}
-      target={props.href ? '_blank' : undefined}
+      target={props.href && !props.internalLink ? '_blank' : undefined}
       {...props}
       classList={{
         line: true,
         ...props.classList,
-        'group flex leading-10 items-center text-gray-10 hover:bg-gray-5 px-4 sm:px-6 border-transparent border-l-2':
+        'group flex leading-10 items-center text-gray-10 hover:bg-gray-5 px-4 sm:px-[22px] border-transparent border-l-2':
           true,
         '!border-orange text-gray-11 bg-gray-6':
           !props.inactive && props.state === 'active',

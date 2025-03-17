@@ -24,6 +24,7 @@ import { AppApi } from "./app";
 import { TokenApi } from "./token";
 import { ProductFilter } from "@terminal/core/product/filter";
 import { getRegionFromIP } from "./ipinfo";
+import packageJson from "../../package.json" assert { type: "json" };
 
 const client = createClient({
   clientID: "api",
@@ -96,12 +97,13 @@ const auth: MiddlewareHandler = async (c, next) => {
 
 const filter: MiddlewareHandler = async (c, next) => {
   // Get IP address from headers
-  const ip = c.req.header("x-terminal-ip") ??
+  const ip =
+    c.req.header("x-terminal-ip") ??
     c.req.header("CloudFront-Viewer-Address")?.split(":")[0];
-  
+
   // Get existing region header if present
   let region = c.req.header("x-terminal-region") as any;
-  
+
   // If no region header but we have an IP, look up the region
   if (!region && ip) {
     try {
@@ -110,7 +112,7 @@ const filter: MiddlewareHandler = async (c, next) => {
       console.error("Error getting region from IP:", error);
     }
   }
-  
+
   return ProductFilter.provide(
     {
       region,
@@ -196,7 +198,7 @@ app.get(
         title: "Terminal API",
         description:
           "The Terminal API gives you access to the same API that powers the award winning Terminal SSH shop (`ssh terminal.shop`).",
-        version: "0.1.0",
+        version: packageJson.version ?? "1.0.0",
       },
       components: {
         securitySchemes: {

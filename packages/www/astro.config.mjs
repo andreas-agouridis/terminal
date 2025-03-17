@@ -13,7 +13,7 @@ import react from '@astrojs/react'
 export default defineConfig({
   integrations: [
     mdx({
-      syntaxHighlight: 'prism',
+      // syntaxHighlight: 'prism',
       remarkPlugins: [remarkDirective, remarkAsides, remarkVhs],
       rehypePlugins: [remarkCode],
     }),

@@ -1,19 +1,27 @@
 ---
 import Layout from '@layouts/base.astro'
-import type { OpenAPIV3_1 } from '@scalar/openapi-types'
-const openapiUrl = 'https://app.stainless.com/api/spec/documented/terminal'
+import ApiReference from '@components/api-reference'
 import { dereference, load } from '@scalar/openapi-parser'
 import { fetchUrls } from '@scalar/openapi-parser/plugins/fetch-urls'
-import { Prism } from '@astrojs/prism'
+import type { OpenAPIV3_1 } from '@scalar/openapi-types'
 
-const { filesystem } = await load(openapiUrl, {
-  plugins: [fetchUrls()],
-})
+const openapiUrl = 'https://app.stainless.com/api/spec/documented/terminal'
 
-const api = await dereference(filesystem)
-const schema = api.schema as OpenAPIV3_1.Document
-const specification = api.specification as OpenAPIV3_1.Document
-const paths = schema.paths!
+// Fetch OpenAPI spec server-side
+let schema: OpenAPIV3_1.Document | null = null
+let specification: OpenAPIV3_1.Document | null = null
+
+try {
+  const { filesystem } = await load(openapiUrl, {
+    plugins: [fetchUrls()],
+  })
+
+  const api = await dereference(filesystem)
+  schema = api.schema as OpenAPIV3_1.Document
+  specification = api.specification as OpenAPIV3_1.Document
+} catch (error) {
+  console.error('Error loading OpenAPI specification:', error)
+}
 
 // Group endpoints by tag
 const endpointsByTag: Record<
@@ -25,296 +33,35 @@ const endpointsByTag: Record<
     operation: OpenAPIV3_1.OperationObject
   }[]
 > = {}
-Object.entries(paths).forEach(([path, pathItem]) => {
-  if (!pathItem) return
 
-  Object.entries(pathItem).forEach(([method, operation]) => {
-    if (method === 'parameters') return // Skip parameters
+if (schema) {
+  const paths = schema.paths || {}
 
-    const tags: string[] = operation.tags || ['default']
-    tags.forEach((tag) => {
-      if (!endpointsByTag[tag]) {
-        endpointsByTag[tag] = []
-      }
-      endpointsByTag[tag].push({
-        id: operation.operationId,
-        path,
-        method,
-        operation,
+  Object.entries(paths).forEach(([path, pathItem]) => {
+    if (!pathItem) return
+
+    Object.entries(pathItem).forEach(([method, operation]) => {
+      if (method === 'parameters') return // Skip parameters
+
+      const tags: string[] = operation.tags || ['default']
+      tags.forEach((tag) => {
+        if (!endpointsByTag[tag]) {
+          endpointsByTag[tag] = []
+        }
+        endpointsByTag[tag].push({
+          id: operation.operationId,
+          path,
+          method,
+          operation,
+        })
       })
     })
   })
-})
-
-// Get all servers
-const servers = specification.servers || []
-
-// Get all security schemes
-const securitySchemes = specification.components?.securitySchemes || {}
+}
 ---
 
 <Layout>
   <div slot="docs">
-    <div class="relative my-20 border-t flex">
-      <!-- Sidebar -->
-      <div class="w-64 border-r overflow-y-auto">
-        <nav class="p-2">
-          {
-            Object.entries(endpointsByTag).map(([tag, endpoints]) => (
-              <div class="mb-6">
-                <h3 class="text-sm uppercase text-gray-7 font-bold mb-2 px-2">
-                  {tag}
-                </h3>
-                <ul>
-                  {endpoints.map((endpoint) => (
-                    <li class="mb-1">
-                      <a
-                        href={`#${endpoint.id}`}
-                        class="flex justify-between items-center px-2 py-1 rounded hover:bg-gray-800"
-                      >
-                        <span>{endpoint.operation.summary}</span>
-                        <span
-                          class:list={{
-                            'text-xs px-2': true,
-                            'text-blue-11': endpoint.method === 'get',
-                            'text-green-11': endpoint.method === 'post',
-                            'text-red-11': endpoint.method === 'delete',
-                            'text-orange': endpoint.method === 'put',
-                          }}
-                        >
-                          {endpoint.method.toUpperCase()}
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))
-          }
-        </nav>
-      </div>
-
-      <!-- Main Content -->
-      <div class="flex-1 flex flex-col overflow-hidden">
-        <div class="p-6 border-b">
-          <div class="flex items-center">
-            <h1 class="text-2xl font-bold">{specification.info!.title}</h1>
-            <span
-              class="ml-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-400"
-            >
-              v{specification.info!.version}
-            </span>
-          </div>
-          <p class="mt-2 text-gray-400">{specification.info!.description}</p>
-
-          <div class="mt-6 p-4 bg-gray-800 rounded">
-            <div class="mb-4">
-              <h3 class="text-sm font-bold mb-2">servers</h3>
-              <select class="w-full bg-gray-800 border rounded p-2 text-white">
-                {
-                  servers.map((server) => (
-                    <option value={server.url}>{server.url}</option>
-                  ))
-                }
-              </select>
-            </div>
-            <div>
-              <h3
-                class="text-sm font-bold mb-2 flex items-center justify-between"
-              >
-                <span>authentication</span>
-                <select
-                  class="bg-gray-800 border border-gray-700 rounded p-1 text-white text-sm"
-                >
-                  {
-                    Object.keys(securitySchemes).map((scheme) => (
-                      <option value={scheme}>{scheme}</option>
-                    ))
-                  }
-                </select>
-              </h3>
-              <div class="flex items-center">
-                <span class="text-gray-400 mr-2">bearer token:</span>
-                <input
-                  type="password"
-                  class="flex-1 bg-transparent border-none"
-                  placeholder="token"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-6">
-          {
-            Object.entries(endpointsByTag).map(([tag, endpoints]) => (
-              <div class="mb-10" id={tag}>
-                <h2 class="text-xl font-bold mb-4">{tag}</h2>
-                {endpoints.map((endpoint) => (
-                  <div
-                    class="mb-8 bg-gray-900 rounded-lg overflow-hidden"
-                    id={endpoint.id}
-                  >
-                    <div class="p-4 border-b border-gray-800">
-                      <div class="flex items-center">
-                        <span class={`text-xs px-2 py-1 rounded mr-3`}>
-                          {endpoint.method.toUpperCase()}
-                        </span>
-                        <h3 class="text-lg font-mono">{endpoint.path}</h3>
-                      </div>
-                      <p class="mt-2 text-gray-400">
-                        {endpoint.operation.description}
-                      </p>
-                    </div>
-                    <div class="p-4">
-                      <h4 class="text-sm uppercase text-gray-400 font-bold mb-2">
-                        ENDPOINTS
-                      </h4>
-                      <div class="bg-gray-900 border border-gray-800 rounded-lg mb-4">
-                        <div class="p-3 flex items-center">
-                          <span class={`text-xs px-2 py-0.5 rounded mr-2`}>
-                            {endpoint.method.toUpperCase()}
-                          </span>
-                          <span class="text-white">{endpoint.path}</span>
-                        </div>
-                      </div>
-
-                      {endpoint.operation.responses && (
-                        <div>
-                          <h4 class="text-sm uppercase text-gray-400 font-bold mb-2">
-                            RESPONSES
-                          </h4>
-                          {Object.entries(endpoint.operation.responses).map(
-                            ([statusCode, response]) => (
-                              <div class="mb-2">
-                                <button class="flex items-center p-3 w-full text-left border border-gray-800 rounded-lg">
-                                  <span class="text-white">{statusCode}</span>
-                                  <span class="ml-2 text-gray-400">
-                                    {response.description}
-                                  </span>
-                                </button>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      )}
-
-                      {/* Updated Code Examples Section */}
-                      {endpoint.operation['x-codeSamples'] &&
-                        endpoint.operation['x-codeSamples'].length > 0 && (
-                          <div class="mt-6">
-                            <h4 class="text-sm uppercase text-gray-400 font-bold mb-2">
-                              EXAMPLES
-                            </h4>
-                            <div class="language-tabs border border-gray-800 rounded-lg">
-                              {endpoint.operation['x-codeSamples'].map(
-                                (sample, index) => (
-                                  <input
-                                    type="radio"
-                                    class="hidden"
-                                    name={`lang-${endpoint.id}`}
-                                    value={sample.lang}
-                                    id={`lang-${sample.lang}-${endpoint.id}`}
-                                    checked={index === 0}
-                                  />
-                                ),
-                              )}
-                              <div class="tabs">
-                                {endpoint.operation['x-codeSamples'].map(
-                                  (sample) => (
-                                    <label
-                                      for={`lang-${sample.lang}-${endpoint.id}`}
-                                      data-lang={sample.lang}
-                                    >
-                                      {sample.lang}
-                                    </label>
-                                  ),
-                                )}
-                              </div>
-                              <div class="tab-content">
-                                {endpoint.operation['x-codeSamples'].map(
-                                  (sample) => (
-                                    <Prism
-                                      lang={sample.lang.toLowerCase()}
-                                      code={sample.source.trim()}
-                                      class="hidden"
-                                    />
-                                  ),
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))
-          }
-        </div>
-      </div>
-    </div>
+    <ApiReference client:load {schema} {specification} {endpointsByTag} />
   </div>
 </Layout>
-
-<style>
-  /* Style the tabs container */
-  .tabs {
-    display: flex;
-    gap: 10px;
-    border-bottom: 1px solid #1f2a44; /* Match border-gray-800 */
-  }
-
-  /* Style individual tabs */
-  .tabs label {
-    padding: 8px 16px;
-    cursor: pointer;
-    background: #333;
-    color: #aaa;
-    transition:
-      background 0.2s,
-      color 0.2s;
-  }
-
-  /* Style code content */
-  .tab-content pre {
-    display: none;
-    background: #000;
-    padding: 16px;
-    border-radius: 0 0 4px 4px;
-    overflow-x: auto;
-    margin: 0;
-  }
-
-  /* Show the selected code sample */
-  .language-tabs
-    input[value='JavaScript']:checked
-    ~ .tab-content
-    .language-javascript,
-  .language-tabs input[value='Python']:checked ~ .tab-content .language-python,
-  .language-tabs input[value='Go']:checked ~ .tab-content .language-go,
-  .language-tabs input[value='Java']:checked ~ .tab-content .language-java,
-  .language-tabs input[value='Kotlin']:checked ~ .tab-content .language-kotlin {
-    display: block;
-  }
-
-  /* Highlight the active tab */
-  .language-tabs
-    input[value='JavaScript']:checked
-    ~ .tabs
-    label[data-lang='JavaScript'],
-  .language-tabs
-    input[value='Python']:checked
-    ~ .tabs
-    label[data-lang='Python'],
-  .language-tabs input[value='Go']:checked ~ .tabs label[data-lang='Go'],
-  .language-tabs input[value='Java']:checked ~ .tabs label[data-lang='Java'],
-  .language-tabs
-    input[value='Kotlin']:checked
-    ~ .tabs
-    label[data-lang='Kotlin'] {
-    background: #000;
-    color: #fff;
-    border-bottom: 2px solid #60a5fa; /* Match text-blue-400 */
-  }
-</style>
