@@ -104,6 +104,7 @@ export const Order = new Page({
                   updated: orderTable.trackingStatusUpdatedAt,
                   label: orderTable.labelURL,
                   address: orderTable.shippingAddress,
+				  email: orderTable.email,
                   amount: sql<string>`COALESCE(${tx
                     .select({
                       amount: sql<number>`SUM(${orderItemTable.amount})`,
@@ -150,6 +151,12 @@ export const Order = new Page({
                 label: row.address!.name,
               }),
             },
+			{
+			  label: "email",
+			  renderCell: (row) => ({
+				label: row.email,
+			  }),
+			},
             "created",
             "status",
             "fulfiller",
