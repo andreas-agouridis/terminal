@@ -202,6 +202,30 @@ export namespace Subscription {
     }),
   );
 
+  export const cancel = fn(z.string(), (input) =>
+    useTransaction(async (tx) => {
+      const response = await tx
+        .update(subscriptionTable)
+        .set({
+          timeDeleted: sql`CURRENT_TIMESTAMP(3)`,
+        })
+        .where(
+          and(
+            eq(subscriptionTable.id, input),
+            eq(subscriptionTable.userID, Actor.userID()),
+            isNull(subscriptionTable.timeDeleted),
+          ),
+        );
+      if (response.rowsAffected === 0) {
+        throw new VisibleError(
+          "not_found",
+          ErrorCodes.NotFound.RESOURCE_NOT_FOUND,
+          "Active subscription not found",
+        );
+      }
+    }),
+  );
+
   export const fromID = fn(Info.shape.id, (id) =>
     useTransaction(async (tx) => {
       const rows = await tx

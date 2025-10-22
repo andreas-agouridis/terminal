@@ -1,8 +1,10 @@
-import { Layout, Page, io } from "@forgeapp/sdk";
+import { Action, Layout, Page, ctx, io } from "@forgeapp/sdk";
 import { useTransaction } from "@terminal/core/drizzle/transaction";
 import { and, count, desc, eq, isNull, like, notLike, or, sql } from "@terminal/core/drizzle/index";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
+import { Subscription } from "@terminal/core/subscription/subscription";
 import { userTable } from "@terminal/core/user/user.sql";
+import { Actor } from "@terminal/core/actor";
 import { addressTable } from "@terminal/core/address/address.sql";
 import {
   productTable,
@@ -82,14 +84,13 @@ export const Subs = new Page({
           },
           rowMenuItems: (row) =>
             [
-              // row.label && {
-              //   label: "Label",
-              //   url: row.label!,
-              // },
-              // row.tracking && {
-              //   label: "Tracking",
-              //   url: row.tracking!,
-              // },
+              {
+                label: "Cancel",
+                route: "subsCoffee/cancel",
+                params: {
+                  id: row.id,
+                },
+              },
             ].filter(Boolean) as any,
           columns: [
             "id",
@@ -130,5 +131,39 @@ export const Subs = new Page({
       ],
     });
   },
-  routes: {},
+  routes: {
+    cancel: new Action({
+      name: "Cancel Subscription",
+      unlisted: true,
+      handler: async () => {
+        const subscriptionId = String(ctx.params.id);
+        
+        const confirmed = await io.confirm(
+          `Are you sure you want to cancel this subscription?`
+        );
+        
+        if (confirmed) {
+          // Get subscription to find userID
+          const subscription = await useTransaction(async (tx) => 
+            tx
+              .select({ userID: subscriptionTable.userID })
+              .from(subscriptionTable)
+              .where(eq(subscriptionTable.id, subscriptionId))
+              .limit(1)
+              .then(rows => rows[0])
+          );
+          
+          if (subscription) {
+            await Actor.provide("system", { userID: subscription.userID }, async () => {
+              await Subscription.cancel(subscriptionId);
+            });
+          }
+        }
+        
+        await ctx.redirect({
+          route: "subsCoffee",
+        });
+      },
+    }),
+  },
 });
