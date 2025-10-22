@@ -1,6 +1,6 @@
 import { Layout, Page, io } from "@forgeapp/sdk";
 import { useTransaction } from "@terminal/core/drizzle/transaction";
-import { and, count, desc, eq, isNull, like, notLike, or, sql } from "@terminal/core/drizzle/index";
+import { and, count, desc, eq, isNull } from "@terminal/core/drizzle/index";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
 import { userTable } from "@terminal/core/user/user.sql";
 import { addressTable } from "@terminal/core/address/address.sql";
@@ -9,8 +9,8 @@ import {
   productVariantTable,
 } from "@terminal/core/product/product.sql";
 
-export const Subs = new Page({
-  name: "Subs: Coffee",
+export const CronSubs = new Page({
+  name: "Subs: Cron",
   handler: async () => {
     const totals = await useTransaction((tx) =>
       tx
@@ -66,14 +66,7 @@ export const Subs = new Page({
                 )
                 .where(and(
 				  isNull(subscriptionTable.timeDeleted),
-				  notLike(productTable.name, "cron"),
-				  input.queryTerm 
-					? or(
-					    like(productTable.name, "%" + input.queryTerm + "%"),
-						like(userTable.email, "%" + input.queryTerm + "%"),
-						like(userTable.name, "%" + input.queryTerm + "%"),
-					  )
-					: sql`true`
+				  eq(productTable.name, "cron")
 				))
                 .orderBy(desc(subscriptionTable.id))
                 .offset(input.offset)

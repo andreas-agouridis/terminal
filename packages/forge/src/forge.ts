@@ -7,6 +7,7 @@ import { User } from "./routes/user";
 import { Order } from "./routes/order";
 import { InventoryPage } from "./routes/inventory";
 import { Subs } from "./routes/subs";
+import { CronSubs } from "./routes/cronsubs";
 
 const forge = new Forge({
   apiKey: Resource.ForgeKey.value,
@@ -17,7 +18,8 @@ const forge = new Forge({
     user: User,
     order: Order,
     inventory: InventoryPage,
-    subs: Subs,
+    subsCoffee: Subs,
+	subsCron: CronSubs,
   },
 });
 
