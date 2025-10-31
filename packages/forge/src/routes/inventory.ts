@@ -47,18 +47,21 @@ export const InventoryPage = new Page({
     create: new Action({
       name: "New item",
       handler: async () => {
-        const [name, description] = await io.group([
+        const [name, description, initialQuantity] = await io.group([
           io.input.text("name"),
           io.input.text("description"),
+          io.input.number("initial quantity").optional(),
         ]);
         await Inventory.create({
           name,
           description,
+          initialQuantity,
         });
       },
     }),
-    record: new Action({
-      name: "Record",
+    adjust: new Action({
+      name: "Adjust quantity",
+      description: "Positive numbers add to inventory, negative numbers subtract from inventory.",
       handler: async () => {
         const all = await useTransaction((tx) =>
           tx
@@ -75,12 +78,40 @@ export const InventoryPage = new Page({
           })),
         });
         const [quantity, notes] = await io.group([
-          io.input.number("quantity"),
+          io.input.number("quantity change (positive to add, negative to remove)"),
           io.input.text("notes").optional(),
         ]);
         await Inventory.record({
           inventoryID: item.value,
           quantity,
+          notes,
+        });
+      },
+    }),
+    setCount: new Action({
+      name: "Set count",
+      handler: async () => {
+        const all = await useTransaction((tx) =>
+          tx
+            .select({
+              id: inventoryTable.id,
+              name: inventoryTable.name,
+            })
+            .from(inventoryTable),
+        );
+        const item = await io.select.single("item", {
+          options: all.map((x) => ({
+            label: x.name,
+            value: x.id,
+          })),
+        });
+        const [targetCount, notes] = await io.group([
+          io.input.number("target count"),
+          io.input.text("notes").optional(),
+        ]);
+        await Inventory.setCount({
+          inventoryID: item.value,
+          targetCount,
           notes,
         });
       },
