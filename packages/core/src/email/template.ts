@@ -7,84 +7,164 @@ import { productTable, productVariantTable } from "../product/product.sql";
 import { subscriptionTable } from "../subscription/subscription.sql";
 import { addressTable } from "../address/address.sql";
 import { DateTime } from "luxon";
+import type { SubscriptionSchedule } from "../subscription/subscription.sql";
 
 const ps = `p.s. No HTML tags were released into the atmosphere producing this 100% organic, css-free, plain text email`;
 
+type SubscriptionData = {
+  email: string | null;
+  name: string | null;
+  productName: string;
+  variantName: string;
+  quantity: number;
+  schedule: SubscriptionSchedule | null;
+  addressID: string;
+};
+
+async function getSubscriptionData(
+  subscriptionID: string,
+): Promise<SubscriptionData | null> {
+  const result = await useTransaction((tx) =>
+    tx
+      .select({
+        email: userTable.email,
+        name: userTable.name,
+        productName: productTable.name,
+        variantName: productVariantTable.name,
+        quantity: subscriptionTable.quantity,
+        schedule: subscriptionTable.schedule,
+        addressID: subscriptionTable.addressID,
+      })
+      .from(subscriptionTable)
+      .innerJoin(userTable, eq(userTable.id, subscriptionTable.userID))
+      .innerJoin(
+        productVariantTable,
+        eq(productVariantTable.id, subscriptionTable.productVariantID),
+      )
+      .innerJoin(
+        productTable,
+        eq(productTable.id, productVariantTable.productID),
+      )
+      .where(eq(subscriptionTable.id, subscriptionID))
+      .limit(1)
+      .then((rows) => rows[0]),
+  );
+  return result || null;
+}
+
+async function getAddress(addressID: string) {
+  return await useTransaction((tx) =>
+    tx
+      .select()
+      .from(addressTable)
+      .where(eq(addressTable.id, addressID))
+      .limit(1)
+      .then((rows) => rows[0]),
+  );
+}
+
+function formatNextDeliveryDate(
+  schedule: SubscriptionSchedule | null,
+): string {
+  if (schedule?.type === "weekly") {
+    return (
+      "on " +
+      DateTime.now()
+        .plus({ weeks: schedule.interval })
+        .toFormat("MMMM d, yyyy")
+    );
+  }
+  return "soon";
+}
+
+function formatAddress(address: {
+  address: {
+    name: string;
+    street1: string;
+    street2?: string | null;
+    city: string;
+    province?: string;
+    zip: string;
+    country: string;
+  };
+}): string {
+  return [
+    address.address.name,
+    address.address.street1 +
+      (address.address.street2 ? "\n" + address.address.street2 : ""),
+    `${address.address.city}, ${address.address.province || ""} ${address.address.zip} ${address.address.country}`,
+  ].join("\n");
+}
+
+function getGreeting(name: string | null): string {
+  return name ? `Dear ${name},` : `Dear Customer,`;
+}
+
 export namespace Template {
   export async function sendSubscriptionConfirmation(subscriptionID: string) {
-    const data = await useTransaction((tx) =>
-      tx
-        .select({
-          email: userTable.email,
-          name: userTable.name,
-          productName: productTable.name,
-          variantName: productVariantTable.name,
-          quantity: subscriptionTable.quantity,
-          schedule: subscriptionTable.schedule,
-          addressID: subscriptionTable.addressID,
-        })
-        .from(subscriptionTable)
-        .innerJoin(userTable, eq(userTable.id, subscriptionTable.userID))
-        .innerJoin(
-          productVariantTable,
-          eq(productVariantTable.id, subscriptionTable.productVariantID),
-        )
-        .innerJoin(
-          productTable,
-          eq(productTable.id, productVariantTable.productID),
-        )
-        .where(eq(subscriptionTable.id, subscriptionID))
-        .limit(1)
-        .then((rows) => rows[0]),
-    );
-
+    const data = await getSubscriptionData(subscriptionID);
     if (!data || !data.email) return;
-
-    // Get address details
-    const address = await useTransaction((tx) =>
-      tx
-        .select()
-        .from(addressTable)
-        .where(eq(addressTable.id, data.addressID))
-        .limit(1)
-        .then((rows) => rows[0]),
-    );
-
-    if (!address) return;
 
     const isCron = data.productName.toLowerCase().includes("cron");
 
-    // Format next delivery based on schedule
-    let nextDate = "soon";
-    if (data.schedule?.type === "weekly") {
-      nextDate =
-        "on " +
-        DateTime.now()
-          .plus({ weeks: data.schedule.interval })
-          .toFormat("MMMM d, yyyy");
+    if (isCron) {
+      await sendCronSubscriptionConfirmation(subscriptionID, data);
+    } else {
+      await sendCoffeeSubscriptionConfirmation(subscriptionID, data);
     }
+  }
+
+  async function sendCronSubscriptionConfirmation(
+    subscriptionID: string,
+    data: SubscriptionData,
+  ) {
+    if (!data.email) return;
+    const address = await getAddress(data.addressID);
+    if (!address) return;
+
+    const nextDate = formatNextDeliveryDate(data.schedule);
+    const greeting = getGreeting(data.name);
 
     const body = [
-      `Dear ${data.name || "{valued_customer_name}"},`,
+      greeting,
       ``,
-      isCron
-        ? `You're now a member of Cron, which is a pretty big deal. You're in the club. One of us. Legend.`
-        : `Thank you for subscribing to Terminal Coffee!`,
+      `You're now a member of Cron, which is a pretty big deal. You're in the club. One of us. Legend.`,
       ``,
-      isCron
-        ? ``
-        : [
-            `Subscription Details:`,
-            `• ${data.quantity}x ${data.productName} (${data.variantName})`,
-            `• Delivery: ${data.schedule?.type === "weekly" ? `Every ${data.schedule.interval} week(s)` : "One-time"}`,
-            ``,
-          ].join("\n"),
       `Your first delivery will arrive ${nextDate}.`,
       ``,
       `Shipping Address:`,
-      `${address.address.name}`,
-      `${address.address.street1 + (address.address.street2 ? "\n" + address.address.street2 : "")}`,
-      `${address.address.city}, ${address.address.province} ${address.address.zip} ${address.address.country}`,
+      formatAddress(address),
+      ``,
+      ps,
+    ].join("\n");
+
+    await Email.send("order", data.email, `Welcome to Cron`, body);
+  }
+
+  async function sendCoffeeSubscriptionConfirmation(
+    subscriptionID: string,
+    data: SubscriptionData,
+  ) {
+    if (!data.email) return;
+    const address = await getAddress(data.addressID);
+    if (!address) return;
+
+    const nextDate = formatNextDeliveryDate(data.schedule);
+    const greeting = getGreeting(data.name);
+
+    const body = [
+      greeting,
+      ``,
+      `Thank you for subscribing to Terminal Coffee!`,
+      ``,
+      `Subscription Details:`,
+      `• ${data.quantity}x ${data.productName} (${data.variantName})`,
+      `• Delivery: ${data.schedule?.type === "weekly" ? `Every ${data.schedule.interval} week(s)` : "One-time"}`,
+      ``,
+      `Your first delivery will arrive ${nextDate}.`,
+      ``,
+      `Shipping Address:`,
+      formatAddress(address),
       ``,
       ps,
     ].join("\n");
@@ -92,7 +172,7 @@ export namespace Template {
     await Email.send(
       "order",
       data.email,
-      isCron ? `Welcome to Cron` : `Terminal Coffee Subscription Confirmed`,
+      `Terminal Coffee Subscription Confirmed`,
       body,
     );
   }
@@ -144,8 +224,10 @@ export namespace Template {
       `• ${i.quantity}x ${i.productName} (${i.variantName}) $${(i.amount / 100).toFixed(2)} ${i.subscriptionID ? "(Subscription)" : ""}`;
     const index = order.index.toString().padStart(3, "0");
     const subscription = items.some((i) => i.subscriptionID);
+    const greeting = order.name ? `Dear ${order.name},` : `Dear Customer,`;
+
     const body = [
-      `Dear {valued_customer_name},`,
+      greeting,
       ``,
       `Thank you for ${subscription ? "subscribing to" : "ordering"} Terminal coffee!`,
       ``,
@@ -202,8 +284,10 @@ export namespace Template {
     if (!data || !data.email) return;
 
     const index = data.index.toString().padStart(3, "0");
+    const greeting = data.name ? `Dear ${data.name},` : `Dear Customer,`;
+
     const body = [
-      `Dear {valued_customer_name},`,
+      greeting,
       ``,
       `Great news! Your Terminal coffee order (#${index}) has shipped and is on its way to you.`,
       ``,
@@ -259,8 +343,10 @@ export namespace Template {
 
     if (!data || !data.email) return;
 
+    const greeting = data.name ? `Dear ${data.name},` : `Dear Customer,`;
+
     const body = [
-      `Dear ${data.name || "{valued_customer_name}"},`,
+      greeting,
       ``,
       `We encountered an issue processing your Terminal Coffee subscription and were unable to complete your order.`,
       ``,
