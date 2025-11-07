@@ -1,0 +1,24 @@
+{
+	"name": "ssh-tui",
+	"module": "src/index.tsx",
+	"type": "module",
+	"devDependencies": {
+		"@biomejs/biome": "2.3.1",
+		"@effect/language-service": "^0.48.0",
+		"@types/bun": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"scripts": {
+		"start": "bun run src/index.tsx"
+	},
+	"dependencies": {
+		"@effect-atom/atom-react": "^0.3.4",
+		"@opentui/core": "^0.1.30",
+		"@opentui/react": "^0.1.30",
+		"@terminaldotshop/sdk": "^1.20.2",
+		"effect": "^3.18.4",
+		"react": "^19.1.1"
+	}
+}
