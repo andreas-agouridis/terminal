@@ -4,8 +4,12 @@
 - go [here](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22memberships%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22user_details%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_r2%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_routes%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_tail%22%2C%22type%22%3A%22read%22%7D%5D&name=sst&accountId=*&zoneId=all)
 - make sure Account Resources is limited to `terminal` instead of `All accounts` and create the api token.
 - save it to a `.env` file like this
+
 ```
 CLOUDFLARE_API_TOKEN=xxx
+STRIPE_API_KEY=xxx
+PLANETSCALE_SERVICE_TOKEN_ID=xxx
+PLANETSCALE_SERVICE_TOKEN=xxx
 ```
 
 #### For terminal team
