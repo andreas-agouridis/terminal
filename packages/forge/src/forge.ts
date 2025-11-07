@@ -6,8 +6,9 @@ import { Cart } from "./routes/cart";
 import { User } from "./routes/user";
 import { Order } from "./routes/order";
 import { InventoryPage } from "./routes/inventory";
-import { Subs } from "./routes/subs";
-import { CronSubs } from "./routes/cronsubs";
+import { Subs } from "./routes/coffee-subs";
+import { CronSubs } from "./routes/cron-subs";
+import { UserProfile } from "./routes/user-profile";
 
 const forge = new Forge({
   apiKey: Resource.ForgeKey.value,
@@ -20,6 +21,7 @@ const forge = new Forge({
     inventory: InventoryPage,
     subsCoffee: Subs,
 	subsCron: CronSubs,
+    userProfile: UserProfile,
   },
 });
 

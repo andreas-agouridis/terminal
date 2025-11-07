@@ -9,7 +9,6 @@ import {
   inArray,
   isNotNull,
   isNull,
-  like,
   or,
   sql,
   sum,
@@ -31,6 +30,8 @@ import {
   productVariantTable,
 } from "@terminal/core/product/product.sql";
 import { Shippo } from "@terminal/core/shippo/index";
+import * as queries from "../queries";
+import * as formatters from "../formatters";
 
 const s3 = new S3Client();
 
@@ -92,39 +93,14 @@ export const Order = new Page({
         }),
         io.display.table("Orders", {
           getData: async (input) => {
-            return useTransaction(async (tx) => ({
-              data: await tx
-                .select({
-                  id: orderTable.id,
-                  created: orderTable.timeCreated,
-                  printed: orderTable.timePrinted,
-                  tracking: orderTable.trackingURL,
-                  status: orderTable.trackingStatus,
-                  fulfiller: orderTable.fulfiller,
-                  updated: orderTable.trackingStatusUpdatedAt,
-                  label: orderTable.labelURL,
-                  address: orderTable.shippingAddress,
-				  email: orderTable.email,
-                  amount: sql<string>`COALESCE(${tx
-                    .select({
-                      amount: sql<number>`SUM(${orderItemTable.amount})`,
-                    })
-                    .from(orderItemTable)
-                    .where(eq(orderItemTable.orderID, orderTable.id))}, 0)`,
-                })
-                .from(orderTable)
-                .where(
-                  input.queryTerm
-                    ? or(
-                        sql`lower(${orderTable.shippingAddress}->>'$.name') LIKE ${"%" + input.queryTerm.toLowerCase().replaceAll(" ", "%") + "%"}`,
-                        like(orderTable.email, "%" + input.queryTerm + "%"),
-                      )
-                    : undefined,
-                )
-                .orderBy(desc(orderTable.id))
-                .offset(input.offset)
-                .limit(input.pageSize),
-            }));
+            const queryTerm = input.queryTerm?.trim();
+            return queries.getAllOrders(
+              {
+                offset: input.offset,
+                pageSize: input.pageSize,
+              },
+              queryTerm,
+            );
           },
           rowMenuItems: (row) =>
             [
@@ -142,19 +118,19 @@ export const Order = new Page({
             {
               label: "amount",
               renderCell: (row) => ({
-                label: `$${parseInt(row.amount) / 100}`,
+                label: formatters.formatCurrency(row.amount),
               }),
             },
             {
               label: "name",
               renderCell: (row) => ({
-                label: row.address!.name,
+                label: row.address?.name || "N/A",
               }),
             },
 			{
 			  label: "email",
 			  renderCell: (row) => ({
-				label: row.email,
+				label: row.email || "N/A",
 			  }),
 			},
             "created",
