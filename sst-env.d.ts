@@ -153,19 +153,6 @@ declare module "sst" {
       "site": string
       "type": "sst.sst.Linkable"
     }
-    "VHS": {
-      "service": string
-      "type": "sst.aws.Service"
-      "url": string
-    }
-    "VhsBucket": {
-      "name": string
-      "type": "sst.aws.Bucket"
-    }
-    "VhsCdn": {
-      "type": "sst.aws.CDN"
-      "url": string
-    }
     "Vpc": {
       "type": "sst.aws.Vpc"
     }
