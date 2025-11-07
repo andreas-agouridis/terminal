@@ -7,7 +7,7 @@
 - `/packages/functions/`: AWS Lambda functions for API endpoints using Hono.js
 - `/packages/www/`: Astro-based website with React components
 - `/packages/go/`: Go-based terminal UI client
-- `/packages/forge/`, `/packages/vhs/`, `/packages/workers/`: Supporting services
+- `/packages/forge/`, `/packages/workers/`: Supporting services
 
 ## Build & Test Commands
 

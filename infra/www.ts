@@ -1,7 +1,6 @@
 import { api, auth } from "./api";
 import { domain } from "./dns";
 import { secret } from "./secret";
-import { vhs } from "./vhs";
 
 export const www = new sst.aws.Astro("Site", {
   domain: {
@@ -10,7 +9,7 @@ export const www = new sst.aws.Astro("Site", {
   },
   path: "./packages/www",
   buildCommand: "bun run build",
-  link: [api, auth, vhs, secret.StripePublic, secret.AirtableSecret],
+  link: [api, auth, secret.StripePublic, secret.AirtableSecret],
 });
 
 export const outputs = {

@@ -5,7 +5,6 @@ import aws from 'astro-sst'
 import mdx from '@astrojs/mdx'
 import remarkDirective from 'remark-directive'
 import { remarkAsides } from './lib/unified/asides'
-import { remarkVhs } from './lib/unified/vhs'
 import { remarkCode } from './lib/unified/code'
 import textjs from '@textjs/core/vite'
 import react from '@astrojs/react'
@@ -13,7 +12,7 @@ import react from '@astrojs/react'
 export default defineConfig({
   integrations: [
     mdx({
-      remarkPlugins: [remarkDirective, remarkAsides, remarkVhs],
+      remarkPlugins: [remarkDirective, remarkAsides],
       rehypePlugins: [remarkCode],
     }),
     tailwind({ applyBaseStyles: false }),
