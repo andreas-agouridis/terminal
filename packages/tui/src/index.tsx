@@ -9,10 +9,17 @@ import { TextAttributes } from "@opentui/core";
 import { render, useKeyboard } from "@opentui/react";
 import { Effect, Match, Option } from "effect";
 
+import { Terminal } from "@terminaldotshop/sdk";
+
 import "./components/pretty-header";
-import { CoffeeGroups } from "./api";
+import { TerminalService } from "./api";
 import type { Section } from "./components/pretty-header";
 import type { Coffee, CoffeeGroup } from "./types";
+
+const keys = {
+	cart: ["cart"],
+	example: ["cart", "example"],
+} as const;
 
 function DisplayCoffeeGroup(props: {
 	group: CoffeeGroup;
@@ -45,17 +52,26 @@ function DisplayCoffeeGroup(props: {
 	);
 }
 
-const runtimeAtom = Atom.runtime(CoffeeGroups.Default);
+const runtimeAtom = Atom.runtime(TerminalService.Default);
 
 // You can then use the AtomRuntime to make Atom's that use the services from the Layer
 const coffeeGroupsAtom = runtimeAtom.atom(
 	Effect.gen(function* () {
-		const coffeeGroups = yield* CoffeeGroups;
+		const coffeeGroups = yield* TerminalService;
 		return yield* coffeeGroups.getAll;
 	}),
 );
 
 const currentCoffeeIdxAtom = Atom.make(0);
+
+const cartAtom = runtimeAtom
+	.atom(
+		Effect.gen(function* () {
+			const coffeeGroups = yield* TerminalService;
+			return yield* coffeeGroups.getCart;
+		}),
+	)
+	.pipe(Atom.withReactivity(keys.cart));
 
 const coffeeStateAtom = Atom.make((get) =>
 	Effect.gen(function* () {
@@ -78,12 +94,15 @@ const coffeeStateAtom = Atom.make((get) =>
 			coffeeIds[currentCoffeeIdx % coffeeIds.length]!,
 		)!;
 
+		const cart = yield* get.result(cartAtom);
+
 		return {
 			coffeeGroups,
 			coffees,
 			coffeeIds,
 			currentCoffeeIdx,
 			currentlySelectedCoffee,
+			cart,
 		};
 	}),
 );
@@ -104,17 +123,49 @@ const moveSelectionAtom = Atom.fn((direction: "next" | "previous", ctx) =>
 	}),
 );
 
+const setItemInCartAtom = runtimeAtom.fn(
+	(args: { productVariantId: string; delta: number }, ctx) =>
+		Effect.gen(function* () {
+			const terminal = yield* TerminalService;
+			const state = yield* ctx.result(coffeeStateAtom);
+
+			const cart = state.cart;
+			const item = cart.items.find(
+				(item) => item.productVariantID === args.productVariantId,
+			);
+			const quantity = item?.quantity ?? 0;
+			return yield* terminal.setItemInCart(
+				args.productVariantId,
+				Math.max(0, quantity + args.delta),
+			);
+		}),
+	{ reactivityKeys: keys.cart },
+);
+
 function CoffeeSelector(props: {
 	coffeeGroups: CoffeeGroup[];
 	coffeeIds: string[];
 	selectedCoffee: Coffee;
+	cart: Terminal.Cart;
 }) {
 	const moveSelection = useAtomSet(moveSelectionAtom);
+	const setItemInCart = useAtomSet(setItemInCartAtom);
+
 	useKeyboard((key) => {
 		if (key.name === "down") {
 			moveSelection("next");
 		} else if (key.name === "up") {
 			moveSelection("previous");
+		} else if (key.name === "right") {
+			setItemInCart({
+				productVariantId: props.selectedCoffee.productVariantId,
+				delta: 1,
+			});
+		} else if (key.name === "left") {
+			setItemInCart({
+				productVariantId: props.selectedCoffee.productVariantId,
+				delta: -1,
+			});
 		}
 	});
 
@@ -185,12 +236,17 @@ function Header(props: { selected: Page; sections: Section<Page>[] }) {
 	);
 }
 
+const refreshCartAtom = runtimeAtom.fn(() => Effect.succeed(void 0), {
+	reactivityKeys: keys.cart,
+});
+
 type Page = "shop" | "account" | "cart";
 
 const pageAtom = Atom.make<Page>("shop");
 
 function App() {
 	const coffeeState = useAtomValue(coffeeStateAtom);
+	const refreshCart = useAtomSet(refreshCartAtom);
 	const [page, setPage] = useAtom(pageAtom);
 
 	const sections: Section<Page>[] = [
@@ -205,6 +261,10 @@ function App() {
 	];
 
 	useKeyboard((key) => {
+		if (key.name === "c") {
+			refreshCart();
+		}
+
 		for (const section of sections) {
 			if (Option.isSome(section.nav)) {
 				const nav = section.nav.value;
@@ -231,28 +291,37 @@ function App() {
 		onDefect: (error) => <text>{`Error: ${error}`}</text>,
 		onError: Match.valueTags({
 			MissingBearerToken: () => <text>Please set TERMINAL_BEARER_TOKEN</text>,
+			GetCartError: ({ cause }) => (
+				<text>{`Could not get cart:: ${cause}`}</text>
+			),
 			ProductListFailure: ({ cause }) => (
 				<text>{`Could not list producsts:: ${cause}`}</text>
 			),
 		}),
 		onSuccess(state) {
-			let pageElement;
+			let pageElement: React.ReactNode;
 
 			switch (page) {
 				case "shop":
-					pageElement = [
+					pageElement = (
 						<CoffeeSelector
 							coffeeGroups={state.value.coffeeGroups}
 							coffeeIds={state.value.coffeeIds}
 							selectedCoffee={state.value.currentlySelectedCoffee}
-						/>,
-					];
+							cart={state.value.cart}
+						/>
+					);
 					break;
 				case "cart":
-					pageElement = [<text>Cart</text>];
+					pageElement = (
+						<box>
+							<text>Cart</text>
+							<text>{`Total: ${state.value.cart.amount.total}`}</text>
+						</box>
+					);
 					break;
 				case "account":
-					pageElement = [<text>Account</text>];
+					pageElement = <text>Account</text>;
 					break;
 			}
 

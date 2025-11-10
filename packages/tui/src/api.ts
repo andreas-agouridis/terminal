@@ -14,8 +14,14 @@ export class ProductListFailure extends Schema.TaggedError<ProductListFailure>(
 	cause: Schema.Defect,
 }) {}
 
-export class CoffeeGroups extends Effect.Service<CoffeeGroups>()(
-	"app/CoffeeGroups",
+export class GetCartError extends Schema.TaggedError<GetCartError>(
+	"GetCartError",
+)("GetCartError", {
+	cause: Schema.Defect,
+}) {}
+
+export class TerminalService extends Effect.Service<TerminalService>()(
+	"app/TerminalService",
 	{
 		effect: Effect.gen(function* () {
 			const bearerToken = yield* Config.redacted("TERMINAL_BEARER_TOKEN").pipe(
@@ -42,6 +48,7 @@ export class CoffeeGroups extends Effect.Service<CoffeeGroups>()(
 							Coffee.make({
 								id: product.id,
 								name: product.name,
+								productVariantId: variant.id,
 								price: variant.price,
 								details: variant.name,
 								description: product.description,
@@ -55,6 +62,7 @@ export class CoffeeGroups extends Effect.Service<CoffeeGroups>()(
 							Coffee.make({
 								id: product.id,
 								name: product.name,
+								productVariantId: variant.id,
 								price: variant.price,
 								details: variant.name,
 								description: product.description,
@@ -76,7 +84,27 @@ export class CoffeeGroups extends Effect.Service<CoffeeGroups>()(
 				}),
 			]);
 
-			return { getAll } as const;
+			const getCart = Effect.tryPromise({
+				try: () => client.cart.get().then((cart) => cart.data),
+				catch: (error) => new GetCartError({ cause: error }),
+			});
+
+			const setItemInCart = (id: string, quantity: number) =>
+				Effect.tryPromise({
+					try: () => {
+						return client.cart.setItem({
+							productVariantID: id,
+							quantity: quantity,
+						});
+					},
+					catch: (error) => new GetCartError({ cause: error }),
+				});
+
+			return {
+				getAll,
+				getCart,
+				setItemInCart,
+			} as const;
 		}),
 	},
 ) {}
