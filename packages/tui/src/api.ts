@@ -1,6 +1,6 @@
 import Terminal from "@terminaldotshop/sdk";
 import { Config, Effect, Redacted, Schema } from "effect";
-import { Coffee, CoffeeGroup } from "./types";
+import { Cart, CartItem, Coffee, CoffeeGroup, ProductVariantID } from "./types";
 
 // TODO: Schema.Defect
 
@@ -46,9 +46,8 @@ export class TerminalService extends Effect.Service<TerminalService>()(
 					for (const variant of product.variants) {
 						featured.push(
 							Coffee.make({
-								id: product.id,
+								id: ProductVariantID(variant.id),
 								name: product.name,
-								productVariantId: variant.id,
 								price: variant.price,
 								details: variant.name,
 								description: product.description,
@@ -60,9 +59,8 @@ export class TerminalService extends Effect.Service<TerminalService>()(
 					for (const variant of product.variants) {
 						originals.push(
 							Coffee.make({
-								id: product.id,
+								id: ProductVariantID(variant.id),
 								name: product.name,
-								productVariantId: variant.id,
 								price: variant.price,
 								details: variant.name,
 								description: product.description,
@@ -85,7 +83,22 @@ export class TerminalService extends Effect.Service<TerminalService>()(
 			]);
 
 			const getCart = Effect.tryPromise({
-				try: () => client.cart.get().then((cart) => cart.data),
+				try: () =>
+					client.cart.get().then((cart) => {
+						const items = cart.data.items.map((item) =>
+							CartItem.make({
+								id: ProductVariantID(item.productVariantID),
+								quantity: item.quantity,
+								subtotal: item.subtotal,
+							}),
+						);
+						return Cart.make({
+							items,
+							subtotal_amount: cart.data.amount.subtotal,
+							shipping_amount: cart.data.amount.shipping,
+							total_amount: cart.data.amount.total,
+						});
+					}),
 				catch: (error) => new GetCartError({ cause: error }),
 			});
 

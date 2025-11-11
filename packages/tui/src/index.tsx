@@ -9,17 +9,17 @@ import { TextAttributes } from "@opentui/core";
 import { render, useKeyboard } from "@opentui/react";
 import { Effect, Match, Option } from "effect";
 
-import { Terminal } from "@terminaldotshop/sdk";
-
 import "./components/pretty-header";
 import { TerminalService } from "./api";
 import type { Section } from "./components/pretty-header";
-import type { Coffee, CoffeeGroup } from "./types";
-
-const keys = {
-	cart: ["cart"],
-	example: ["cart", "example"],
-} as const;
+import { Coffee, CoffeeGroup, ProductVariantID, Cart, Page } from "./types";
+import { CartPage } from "./components/cart-page";
+import {
+	moveSelectionAtom,
+	setItemInCartAtom,
+	coffeeStateAtom,
+	refreshCartAtom,
+} from "./state";
 
 function DisplayCoffeeGroup(props: {
 	group: CoffeeGroup;
@@ -52,104 +52,19 @@ function DisplayCoffeeGroup(props: {
 	);
 }
 
-const runtimeAtom = Atom.runtime(TerminalService.Default);
-
-// You can then use the AtomRuntime to make Atom's that use the services from the Layer
-const coffeeGroupsAtom = runtimeAtom.atom(
-	Effect.gen(function* () {
-		const coffeeGroups = yield* TerminalService;
-		return yield* coffeeGroups.getAll;
-	}),
-);
-
-const currentCoffeeIdxAtom = Atom.make(0);
-
-const cartAtom = runtimeAtom
-	.atom(
-		Effect.gen(function* () {
-			const coffeeGroups = yield* TerminalService;
-			return yield* coffeeGroups.getCart;
-		}),
-	)
-	.pipe(Atom.withReactivity(keys.cart));
-
-const coffeeStateAtom = Atom.make((get) =>
-	Effect.gen(function* () {
-		const coffeeGroups = yield* get.result(coffeeGroupsAtom);
-		const currentCoffeeIdx = get(currentCoffeeIdxAtom);
-
-		const coffees = coffeeGroups.reduce((acc, group) => {
-			for (const coffee of group.coffees) {
-				acc.set(coffee.id, coffee);
-			}
-
-			return acc;
-		}, new Map<string, Coffee>());
-
-		const coffeeIds = coffeeGroups.flatMap((group) =>
-			group.coffees.map((coffee) => coffee.id),
-		);
-
-		const currentlySelectedCoffee = coffees.get(
-			coffeeIds[currentCoffeeIdx % coffeeIds.length]!,
-		)!;
-
-		const cart = yield* get.result(cartAtom);
-
-		return {
-			coffeeGroups,
-			coffees,
-			coffeeIds,
-			currentCoffeeIdx,
-			currentlySelectedCoffee,
-			cart,
-		};
-	}),
-);
-
-const moveSelectionAtom = Atom.fn((direction: "next" | "previous", ctx) =>
-	Effect.gen(function* () {
-		const state = yield* ctx.result(coffeeStateAtom);
-		if (state.coffeeIds.length === 0) {
-			return;
-		}
-
-		const delta = direction === "next" ? 1 : -1;
-		const nextIndex =
-			(state.currentCoffeeIdx + delta + state.coffeeIds.length) %
-			state.coffeeIds.length;
-
-		ctx.set(currentCoffeeIdxAtom, nextIndex);
-	}),
-);
-
-const setItemInCartAtom = runtimeAtom.fn(
-	(args: { productVariantId: string; delta: number }, ctx) =>
-		Effect.gen(function* () {
-			const terminal = yield* TerminalService;
-			const state = yield* ctx.result(coffeeStateAtom);
-
-			const cart = state.cart;
-			const item = cart.items.find(
-				(item) => item.productVariantID === args.productVariantId,
-			);
-			const quantity = item?.quantity ?? 0;
-			return yield* terminal.setItemInCart(
-				args.productVariantId,
-				Math.max(0, quantity + args.delta),
-			);
-		}),
-	{ reactivityKeys: keys.cart },
-);
-
 function CoffeeSelector(props: {
 	coffeeGroups: CoffeeGroup[];
 	coffeeIds: string[];
 	selectedCoffee: Coffee;
-	cart: Terminal.Cart;
+	cart: Cart;
 }) {
 	const moveSelection = useAtomSet(moveSelectionAtom);
 	const setItemInCart = useAtomSet(setItemInCartAtom);
+
+	const cartItemForSelected = props.cart.items.find(
+		(item) => item.id === props.selectedCoffee.id,
+	);
+	const currentQuantity = cartItemForSelected?.quantity ?? 0;
 
 	useKeyboard((key) => {
 		if (key.name === "down") {
@@ -158,19 +73,19 @@ function CoffeeSelector(props: {
 			moveSelection("previous");
 		} else if (key.name === "right") {
 			setItemInCart({
-				productVariantId: props.selectedCoffee.productVariantId,
+				id: props.selectedCoffee.id,
 				delta: 1,
 			});
 		} else if (key.name === "left") {
 			setItemInCart({
-				productVariantId: props.selectedCoffee.productVariantId,
+				id: props.selectedCoffee.id,
 				delta: -1,
 			});
 		}
 	});
 
 	return (
-		<box flexDirection="row" width="100%">
+		<box flexDirection="row" width="100%" height="100%" minHeight="100%">
 			<box width="25%">
 				{props.coffeeGroups.map((group) => (
 					<box key={group.name} gap={1} width="100%">
@@ -181,44 +96,45 @@ function CoffeeSelector(props: {
 					</box>
 				))}
 			</box>
-			<box
-				alignItems="flex-start"
-				justifyContent="flex-start"
-				width="75%"
-				height="100%"
-				minHeight="100%"
-				padding={1}
-				border
-				borderColor="white"
-			>
+			<box width="75%" height="100%" minHeight="100%">
 				<box
-					width="100%"
-					alignItems="center"
-					justifyContent="center"
-					flexDirection="row"
+					alignItems="flex-start"
+					justifyContent="flex-start"
+					padding={1}
+					border
+					borderColor="white"
 				>
-					<text attributes={TextAttributes.BOLD}>
-						{props.selectedCoffee.name}
+					<box
+						width="100%"
+						alignItems="center"
+						justifyContent="center"
+						flexDirection="row"
+					>
+						<text attributes={TextAttributes.BOLD}>
+							{props.selectedCoffee.name}
+						</text>
+					</box>
+					<box
+						justifyContent="center"
+						alignItems="center"
+						width="100%"
+						height="100%"
+						flexDirection="row"
+					>
+						<text attributes={TextAttributes.DIM}>
+							{`${props.selectedCoffee.details} |`}
+						</text>
+						<text fg={props.selectedCoffee.color}>
+							{` ($${props.selectedCoffee.price / 100})`}
+						</text>
+					</box>
+					<text width="100%" wrapMode="word">
+						{props.selectedCoffee.description}
 					</text>
 				</box>
-				<box
-					justifyContent="center"
-					alignItems="center"
-					width="100%"
-					flexDirection="row"
-				>
-					<text attributes={TextAttributes.DIM}>
-						{`${props.selectedCoffee.details} |`}
-					</text>
-					<text fg={props.selectedCoffee.color}>
-						{` ($${props.selectedCoffee.price / 100})`}
-					</text>
+				<box height={3} alignItems="center" justifyContent="center">
+					<text>{`< ${currentQuantity} >`}</text>
 				</box>
-				<text></text>
-				<text></text>
-				<text width="100%" wrapMode="word">
-					{props.selectedCoffee.description}
-				</text>
 			</box>
 		</box>
 	);
@@ -235,12 +151,6 @@ function Header(props: { selected: Page; sections: Section<Page>[] }) {
 		/>
 	);
 }
-
-const refreshCartAtom = runtimeAtom.fn(() => Effect.succeed(void 0), {
-	reactivityKeys: keys.cart,
-});
-
-type Page = "shop" | "account" | "cart";
 
 const pageAtom = Atom.make<Page>("shop");
 
@@ -314,10 +224,7 @@ function App() {
 					break;
 				case "cart":
 					pageElement = (
-						<box>
-							<text>Cart</text>
-							<text>{`Total: ${state.value.cart.amount.total}`}</text>
-						</box>
+						<CartPage cart={state.value.cart} coffees={state.value.coffees} />
 					);
 					break;
 				case "account":
