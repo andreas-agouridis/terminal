@@ -134,7 +134,9 @@ export namespace ShortLink {
       await tx
         .update(shortLinkTable)
         .set({ clickCount: sql`${shortLinkTable.clickCount} + 1` })
-        .where(eq(shortLinkTable.slug, slug));
+        .where(
+          and(eq(shortLinkTable.slug, slug), isNull(shortLinkTable.timeDeleted)),
+        );
     }),
   );
 
