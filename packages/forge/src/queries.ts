@@ -109,6 +109,59 @@ export async function getAllOrders(pagination: PaginationInput, queryTerm?: stri
 }
 
 /**
+ * Get orders without a tracking status (for admin views)
+ * Uses LEFT JOIN with GROUP BY to efficiently calculate order totals
+ */
+export async function getOrdersWithoutStatus(pagination: PaginationInput, queryTerm?: string) {
+  return useTransaction(async (tx) => ({
+    data: await tx
+      .select({
+        id: orderTable.id,
+        created: orderTable.timeCreated,
+        printed: orderTable.timePrinted,
+        tracking: orderTable.trackingURL,
+        status: orderTable.trackingStatus,
+        fulfiller: orderTable.fulfiller,
+        updated: orderTable.trackingStatusUpdatedAt,
+        label: orderTable.labelURL,
+        address: orderTable.shippingAddress,
+        email: orderTable.email,
+        amount: sql<string>`COALESCE(SUM(${orderItemTable.amount}), 0)`,
+        stripePaymentIntentID: orderTable.stripePaymentIntentID,
+      })
+      .from(orderTable)
+      .leftJoin(orderItemTable, eq(orderItemTable.orderID, orderTable.id))
+      .where(
+        and(
+          isNull(orderTable.trackingStatus),
+          queryTerm
+            ? or(
+                sql`lower(${orderTable.shippingAddress}->>'$.name') LIKE ${"%" + queryTerm.toLowerCase().replaceAll(" ", "%") + "%"}`,
+                like(orderTable.email, "%" + queryTerm + "%"),
+              )
+            : undefined,
+        ),
+      )
+      .groupBy(
+        orderTable.id,
+        orderTable.timeCreated,
+        orderTable.timePrinted,
+        orderTable.trackingURL,
+        orderTable.trackingStatus,
+        orderTable.fulfiller,
+        orderTable.trackingStatusUpdatedAt,
+        orderTable.labelURL,
+        orderTable.shippingAddress,
+        orderTable.email,
+        orderTable.stripePaymentIntentID,
+      )
+      .orderBy(desc(orderTable.id))
+      .offset(pagination.offset)
+      .limit(pagination.pageSize),
+  }));
+}
+
+/**
  * Get subscriptions for a user with product and address details
  */
 export async function getUserSubscriptions(userID: string, pagination: PaginationInput) {
@@ -280,6 +333,20 @@ export async function getUser(userID: string) {
       .select()
       .from(userTable)
       .where(eq(userTable.id, userID))
+      .limit(1)
+      .then((rows) => rows[0]),
+  );
+}
+
+/**
+ * Get a single address by ID
+ */
+export async function getAddress(addressID: string) {
+  return useTransaction(async (tx) =>
+    tx
+      .select()
+      .from(addressTable)
+      .where(eq(addressTable.id, addressID))
       .limit(1)
       .then((rows) => rows[0]),
   );

@@ -91,7 +91,7 @@ export function formatCardExpiration(
 }
 
 /**
- * Format boolean as Yes/No
+ * Format boolean or truthy value as Yes/No
  */
 export function formatBoolean(value: boolean | null | undefined): string {
   return value ? "Yes" : "No";

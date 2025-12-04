@@ -17,6 +17,7 @@ import {
   sql,
   sum,
   desc,
+  or,
 } from "drizzle-orm";
 import { cartItemTable, cartTable } from "../cart/cart.sql";
 import {
@@ -565,9 +566,11 @@ export namespace Order {
         // NOTE: Keeping ammounts of cost set to $0, since this is for internal/promo orders.
         //       We eat the cost later when we pay our roasters & shippers.
         const orderID = createID("order");
+
         await tx.insert(orderTable).values({
           id: orderID,
           email: input.email,
+          fulfiller: "qc",
           shippingAmount: 0,
           shippingAddress: input.address,
           shippoRateID: shippingInfo.shippoRateID,
@@ -664,7 +667,6 @@ export namespace Order {
 
   export const update = fn(UpdateInput, async (input) =>
     useTransaction(async (tx) => {
-      // Check that order exists and belongs to the user
       const order = await tx
         .select({
           id: orderTable.id,
@@ -674,7 +676,13 @@ export namespace Order {
         .where(
           and(
             eq(orderTable.id, input.id),
-            eq(orderTable.userID, Actor.userID()),
+            or(
+              // If userID is null, then it's a system order, so it's fine.
+              isNull(orderTable.userID),
+
+              // Otherwise, check that the userID matches the current user.
+              eq(orderTable.userID, Actor.userID()),
+            ),
           ),
         )
         .limit(1)

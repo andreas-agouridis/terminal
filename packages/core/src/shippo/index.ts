@@ -9,6 +9,7 @@ import { z } from "zod";
 import { userTable } from "../user/user.sql";
 import { Log } from "../util/log";
 import { Order } from "../order/order";
+import { Actor } from "../actor";
 
 const TERMINAL_ADDRESS = {
   name: "Terminal Products Inc",

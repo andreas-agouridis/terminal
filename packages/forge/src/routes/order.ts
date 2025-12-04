@@ -280,7 +280,7 @@ export const Order = new Page({
     }),
 
     create: new Action({
-      name: "Create",
+      name: "Create Order",
       handler: async () => {
         const products = await Product.list();
         const results = await io.group(
@@ -310,8 +310,6 @@ export const Order = new Page({
           city,
           province,
           zip,
-          country,
-          phone,
         ] = await io.group([
           io.input.text("Email"),
           io.input.text("Name"),
@@ -320,9 +318,8 @@ export const Order = new Page({
           io.input.text("City"),
           io.input.text("State / Province"),
           io.input.text("Zip"),
-          io.input.text("Country"),
-          io.input.text("Phone").optional(),
         ]);
+
         await OrderM.createInternal({
           email,
           items,
@@ -333,8 +330,7 @@ export const Order = new Page({
             city,
             province,
             zip,
-            country,
-            phone,
+            country: "US",
           },
         });
         await ctx.redirect({
@@ -343,7 +339,7 @@ export const Order = new Page({
       },
     }),
     shipping: new Action({
-      name: "Shipping",
+      name: "Test Shipping",
       async handler() {
         const [
           email,
@@ -385,6 +381,138 @@ export const Order = new Page({
         });
 
         await io.display.object("shipping", { data: shipping });
+      },
+    }),
+
+    noStatus: new Page({
+      name: "No Status",
+      handler: async () => {
+        return new Layout({
+          title: "Orders Without Status",
+          children: [
+            io.display.table("Orders", {
+              getData: async (input) => {
+                const queryTerm = input.queryTerm?.trim();
+                return queries.getOrdersWithoutStatus(
+                  {
+                    offset: input.offset,
+                    pageSize: input.pageSize,
+                  },
+                  queryTerm,
+                );
+              },
+              rowMenuItems: (row) =>
+                !row.stripePaymentIntentID
+                  ? [
+                      {
+                        label: "Delete",
+                        route: "order/noStatus/delete",
+                        params: { id: row.id },
+                      },
+                    ]
+                  : [],
+              columns: [
+                "id",
+                {
+                  label: "amount",
+                  renderCell: (row) => ({
+                    label: formatters.formatCurrency(row.amount),
+                  }),
+                },
+                {
+                  label: "name",
+                  renderCell: (row) => ({
+                    label: row.address?.name || "N/A",
+                  }),
+                },
+                {
+                  label: "email",
+                  renderCell: (row) => ({
+                    label: row.email || "N/A",
+                  }),
+                },
+                "created",
+                "status",
+                "fulfiller",
+                "updated",
+                "printed",
+                {
+                  label: "hasStripe",
+                  renderCell: (row) => ({
+                    label: row.stripePaymentIntentID ? "Yes" : "No",
+                  }),
+                },
+              ],
+              isSortable: false,
+            }),
+          ],
+        });
+      },
+      routes: {
+        delete: new Action({
+          name: "Delete Order",
+          unlisted: true,
+          handler: async () => {
+            const orderID = ctx.params.id as string;
+
+            // Fetch the order to verify it has no Stripe payment and show details
+            const order = await useTransaction((tx) =>
+              tx
+                .select({
+                  id: orderTable.id,
+                  email: orderTable.email,
+                  address: orderTable.shippingAddress,
+                  stripePaymentIntentID: orderTable.stripePaymentIntentID,
+                  trackingStatus: orderTable.trackingStatus,
+                })
+                .from(orderTable)
+                .where(eq(orderTable.id, orderID))
+                .then((rows) => rows[0]),
+            );
+
+            if (!order) {
+              await io.display.markdown(`Order **${orderID}** not found.`);
+              return;
+            }
+
+            if (order.stripePaymentIntentID) {
+              await io.display.markdown(
+                `Cannot delete order **${orderID}** - it has a Stripe payment intent associated with it.`,
+              );
+              return;
+            }
+
+            // Show order details and ask for confirmation
+            await io.display.metadata("Order Details", {
+              layout: "list",
+              data: [
+                { label: "Order ID", value: order.id },
+                { label: "Email", value: order.email || "N/A" },
+                { label: "Name", value: order.address?.name || "N/A" },
+                { label: "Tracking Status", value: order.trackingStatus || "None" },
+              ],
+            });
+
+            const confirmed = await io.confirm(
+              "Are you sure you want to permanently delete this order? This action cannot be undone.",
+            );
+
+            if (confirmed) {
+              console.log(`[Order Delete] Deleting order ${orderID}`, {
+                email: order.email,
+                name: order.address?.name,
+              });
+
+              await useTransaction((tx) =>
+                tx.delete(orderTable).where(eq(orderTable.id, orderID)),
+              );
+
+              console.log(`[Order Delete] Successfully deleted order ${orderID}`);
+            }
+
+            await ctx.redirect({ route: "order/noStatus" });
+          },
+        }),
       },
     }),
   },

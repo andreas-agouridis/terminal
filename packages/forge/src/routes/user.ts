@@ -30,6 +30,21 @@ export const User = new Page({
               queryTerm,
             );
           },
+          columns: [
+            {
+              label: "id",
+              renderCell: (row) => ({
+                label: row.id,
+                route: "userProfile",
+                params: {
+                  userID: row.id,
+                },
+              }),
+            },
+            "name",
+            "email",
+            "timeCreated",
+          ],
           rowMenuItems: (row) => [
             {
               label: "Create Order",
