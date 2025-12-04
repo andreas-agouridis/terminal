@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db": "sst shell drizzle-kit",
     "db:push": "sst shell drizzle-kit push",
-    "db:connect": "sst shell ../scripts/mysql"
+    "db:connect": "sst shell ../scripts/src/mysql.ts"
   },
   "devDependencies": {
     "@types/bun": "1.1.5",

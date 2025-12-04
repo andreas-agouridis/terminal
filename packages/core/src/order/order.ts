@@ -186,6 +186,30 @@ export namespace Order {
     ),
   };
 
+  /**
+   * Calculate total weight in ounces for a set of variant items.
+   * Used by Order.create and Order.createInternal to get accurate weights for shipping.
+   */
+  export const calculateTotalWeight = fn(
+    z.record(z.number().int()),
+    async (variants) => {
+      if (Object.keys(variants).length === 0) return 0;
+      const rows = await useTransaction(async (tx) =>
+        tx
+          .select({
+            id: productVariantTable.id,
+            weight: productVariantTable.weight,
+          })
+          .from(productVariantTable)
+          .where(inArray(productVariantTable.id, Object.keys(variants))),
+      );
+      return rows.reduce(
+        (total, row) => total + row.weight * (variants[row.id] ?? 0),
+        0,
+      );
+    },
+  );
+
   export const list = () =>
     useTransaction(async (tx) => {
       const rows = await tx
@@ -513,6 +537,12 @@ export namespace Order {
     },
   );
 
+  /**
+   * Create an internal/admin order (e.g., via Forge).
+   * NOTE: This intentionally sets shippingAmount and item amounts to $0 since these
+   * are internal/promo orders. However, we still need accurate weight for Shippo
+   * to generate correct shipping labels.
+   */
   export const createInternal = fn(
     z.object({
       email: z.string().email(),
@@ -521,12 +551,19 @@ export namespace Order {
     }),
     async (input) => {
       await Shippo.assertValidAddress(input.address);
+
+      // Calculate accurate weight for Shippo label generation
+      const totalOunces = await calculateTotalWeight(input.items);
+
       const shippingInfo = await Shippo.createShipmentRate({
-        ounces: 0,
+        ounces: totalOunces,
         address: input.address,
         subtotal: 0,
       });
+
       return await useTransaction(async (tx) => {
+        // NOTE: Keeping ammounts of cost set to $0, since this is for internal/promo orders.
+        //       We eat the cost later when we pay our roasters & shippers.
         const orderID = createID("order");
         await tx.insert(orderTable).values({
           id: orderID,
@@ -535,6 +572,7 @@ export namespace Order {
           shippingAddress: input.address,
           shippoRateID: shippingInfo.shippoRateID,
         });
+
         for (const [productVariantID, quantity] of Object.entries(
           input.items,
         )) {
