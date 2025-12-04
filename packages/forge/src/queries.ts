@@ -304,6 +304,7 @@ export async function getAllUsers(
   if (queryTerm) {
     whereConditions.push(
       or(
+        like(userTable.id, "%" + queryTerm + "%"),
         like(userTable.name, "%" + queryTerm + "%"),
         like(userTable.email, "%" + queryTerm + "%"),
       )!,
