@@ -9,6 +9,7 @@ import { InventoryPage } from "./routes/inventory";
 import { Subs } from "./routes/coffee-subs";
 import { CronSubs } from "./routes/cron-subs";
 import { UserProfile } from "./routes/user-profile";
+import { ShortLinkPage } from "./routes/short-link";
 
 const forge = new Forge({
   apiKey: Resource.ForgeKey.value,
@@ -22,6 +23,7 @@ const forge = new Forge({
     subsCoffee: Subs,
 	  subsCron: CronSubs,
     userProfile: UserProfile,
+    shortLink: ShortLinkPage,
   },
 });
 
