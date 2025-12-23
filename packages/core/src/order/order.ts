@@ -273,7 +273,7 @@ export namespace Order {
           productVariantTable,
           eq(orderItemTable.productVariantID, productVariantTable.id),
         )
-        .where(eq(orderTable.id, input))
+        .where(and(eq(orderTable.id, input), eq(orderTable.userID, Actor.userID())))
         .then((rows): Info | undefined =>
           rows.length === 0
             ? undefined
