@@ -178,17 +178,6 @@ new sst.aws.Cron("SubscriptionProcessor", {
   },
 });
 
-// On-demand entry point for triggering subscription processing immediately (e.g. from Forge).
-export const SubscriptionProcessorOnDemand = new sst.aws.Function(
-  "SubscriptionProcessorOnDemand",
-  {
-    link: [database, bus, ...Object.values(secret), shortDomainEmail],
-    memory: "2048 MB",
-    handler: "./packages/functions/src/cron/subscription.handler",
-    timeout: "15 minutes",
-  },
-);
-
 new sst.aws.Cron("EUFulfillment", {
   schedule: "rate(1 day)",
   job: {

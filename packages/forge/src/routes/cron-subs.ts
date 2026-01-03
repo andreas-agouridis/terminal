@@ -4,9 +4,8 @@ import { and, eq, inArray, isNotNull, isNull, sql } from "@terminal/core/drizzle
 import { productTable, productVariantTable } from "@terminal/core/product/product.sql";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
 import { orderItemTable, orderTable } from "@terminal/core/order/order.sql";
+import { Subscription } from "@terminal/core/subscription/subscription";
 import { DateTime } from "luxon";
-import { Resource } from "sst";
-import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { createSubscriptionsPage } from "../pages/subscriptions-page";
 
 const COOLDOWN_DAYS = 21;
@@ -195,20 +194,17 @@ export const CronSubs = createSubscriptionsPage({
             return;
           }
 
-        const lambda = new LambdaClient();
-        const invoked = await lambda.send(
-          new InvokeCommand({
-            FunctionName: Resource.SubscriptionProcessorOnDemand.name,
-            InvocationType: "Event",
-          }),
-        );
+        await ctx.loading.start({
+          label: "Processing subscriptions",
+          description: "Creating any due subscription orders now.",
+        });
+        await Subscription.process();
 
         await io.display.metadata("Cron run started", {
           layout: "list",
           data: [
             { label: "Subscriptions scheduled", value: result.updatedSubscriptions },
             { label: "Scheduled timeNext", value: target.toISOString() },
-            { label: "Processor invoked", value: invoked.StatusCode?.toString() ?? "unknown" },
             {
               label: "Next allowed",
               value: DateTime.utc().plus({ days: COOLDOWN_DAYS }).toISO(),
