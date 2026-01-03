@@ -137,6 +137,10 @@ declare module "sst" {
       "secret": string
       "type": "stripe.index/webhookEndpoint.WebhookEndpoint"
     }
+    "SubscriptionProcessorOnDemand": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "TwitchClientID": {
       "type": "sst.sst.Secret"
       "value": string

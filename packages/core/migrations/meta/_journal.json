@@ -36,6 +36,13 @@
       "when": 1764819365906,
       "tag": "0004_amazing_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1767423600000,
+      "tag": "0005_focused_cooldown",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,8 @@ type SubscriptionPageConfig = {
   productFilter: SQL;
   routeName: string;
   getRowMenuItems?: (row: SubscriptionRow) => any[];
+  getMenuItems?: () => any[] | Promise<any[]>;
+  getHeader?: () => any[] | Promise<any[]>;
   routes?: Record<string, Action>;
 };
 
@@ -34,6 +36,8 @@ export function createSubscriptionsPage(config: SubscriptionPageConfig) {
     productFilter,
     routeName,
     getRowMenuItems,
+    getMenuItems,
+    getHeader,
     routes = {},
   } = config;
 
@@ -113,10 +117,14 @@ export function createSubscriptionsPage(config: SubscriptionPageConfig) {
           ),
       );
 
+      const header = (await getHeader?.()) ?? [];
+      const menuItems = (await getMenuItems?.()) ?? [];
+
       return new Layout({
         title: "Subscription",
-        menuItems: [],
+        menuItems,
         children: [
+          ...header,
           io.display.heading(
             "Active Subscriptions: " + totals[0]?.count?.toString(),
             {

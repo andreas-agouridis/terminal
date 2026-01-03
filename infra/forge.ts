@@ -2,11 +2,12 @@ import { bus } from "./bus";
 import { cluster } from "./cluster";
 import { database } from "./database";
 import { allSecrets } from "./secret";
+import { SubscriptionProcessorOnDemand } from "./api";
 
 const bucket = new sst.aws.Bucket("IntervalBucket");
 
 cluster.addService("Forge", {
-  link: [...allSecrets, database, bucket, bus],
+  link: [...allSecrets, database, bucket, bus, SubscriptionProcessorOnDemand],
   cpu: "0.25 vCPU",
   memory: "0.5 GB",
   image: {
