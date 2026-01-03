@@ -3,21 +3,62 @@ import { createTransaction } from "@terminal/core/drizzle/transaction";
 import { and, eq, inArray, isNull } from "@terminal/core/drizzle/index";
 import { productTable, productVariantTable } from "@terminal/core/product/product.sql";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
-import { SystemJobRun } from "@terminal/core/system/job-run";
 import { DateTime } from "luxon";
 import { Resource } from "sst";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { createSubscriptionsPage } from "../pages/subscriptions-page";
 
 const COOLDOWN_DAYS = 21;
-const JOB_NAME = `forge:cron-subs:run-now:${Resource.App.stage}`;
+const COOLDOWN_KEY = `cron-subs/run-now/${Resource.App.stage}.json`;
+
+const s3 = new S3Client();
+
+async function getCooldownStatus() {
+  try {
+    const res = await s3.send(
+      new GetObjectCommand({
+        Bucket: Resource.IntervalBucket.name,
+        Key: COOLDOWN_KEY,
+      }),
+    );
+    const body = await res.Body?.transformToString();
+    const parsed = body ? JSON.parse(body) : {};
+    const lastRunAt = parsed?.lastRunAt ? new Date(parsed.lastRunAt) : null;
+    const nextAllowedAt = lastRunAt
+      ? DateTime.fromJSDate(lastRunAt).toUTC().plus({ days: COOLDOWN_DAYS }).toJSDate()
+      : null;
+    const allowed = !nextAllowedAt || nextAllowedAt <= new Date();
+    return { allowed, lastRunAt, nextAllowedAt };
+  } catch (e: any) {
+    // If the object doesn't exist yet, there's no cooldown.
+    if (e?.name === "NoSuchKey" || e?.$metadata?.httpStatusCode === 404) {
+      return { allowed: true, lastRunAt: null as Date | null, nextAllowedAt: null as Date | null };
+    }
+    throw e;
+  }
+}
+
+async function recordCooldownRun(data: { lastRunAt: Date; updatedSubscriptions: number }) {
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: Resource.IntervalBucket.name,
+      Key: COOLDOWN_KEY,
+      ContentType: "application/json",
+      Body: JSON.stringify({
+        lastRunAt: data.lastRunAt.toISOString(),
+        updatedSubscriptions: data.updatedSubscriptions,
+      }),
+    }),
+  );
+}
 
 export const CronSubs = createSubscriptionsPage({
   name: "Subs: Cron",
   productFilter: eq(productTable.name, "cron"),
   routeName: "subsCron",
   getHeader: async () => {
-    const status = await SystemJobRun.getStatus(JOB_NAME, COOLDOWN_DAYS);
+    const status = await getCooldownStatus();
     const fmt = (d: Date) =>
       DateTime.fromJSDate(d).toUTC().toFormat("yyyy-LL-dd HH:mm 'UTC'");
     const last = status.lastRunAt ? fmt(status.lastRunAt) : "Never";
@@ -41,7 +82,7 @@ export const CronSubs = createSubscriptionsPage({
     ];
   },
   getMenuItems: async () => {
-    const status = await SystemJobRun.getStatus(JOB_NAME, COOLDOWN_DAYS);
+    const status = await getCooldownStatus();
     if (!status.allowed) return [];
     return [
       {
@@ -55,7 +96,7 @@ export const CronSubs = createSubscriptionsPage({
       name: "Run Cron now",
       unlisted: true,
       handler: async () => {
-        const status = await SystemJobRun.getStatus(JOB_NAME, COOLDOWN_DAYS);
+        const status = await getCooldownStatus();
 
         if (!status.allowed) {
           await io.display.markdown(
@@ -100,30 +141,9 @@ export const CronSubs = createSubscriptionsPage({
             );
 
           if (subs.length === 0) {
-            const current = await SystemJobRun.getStatusTx(tx, JOB_NAME, COOLDOWN_DAYS);
             return {
-              claimed: false,
-              ...current,
               updatedSubscriptions: 0,
               reason: "no_subscriptions" as const,
-            };
-          }
-
-          const claim = await SystemJobRun.claimTx(tx, {
-            name: JOB_NAME,
-            cooldownDays: COOLDOWN_DAYS,
-            metadata: {
-              stage: Resource.App.stage,
-              requestedAt: new Date().toISOString(),
-              subscriptions: subs.length,
-            },
-          });
-
-          if (!claim.claimed) {
-            return {
-              ...claim,
-              updatedSubscriptions: 0,
-              reason: "cooldown" as const,
             };
           }
 
@@ -135,25 +155,24 @@ export const CronSubs = createSubscriptionsPage({
             .where(inArray(subscriptionTable.id, subs.map((s) => s.id)));
 
           return {
-            ...claim,
             updatedSubscriptions: subs.length,
             reason: "scheduled" as const,
           };
         });
 
-        if (!result.claimed) {
           if ((result as any).reason === "no_subscriptions") {
             await io.display.markdown(
               `No active Cron subscriptions were found to schedule.`,
             );
             return;
           }
-          await io.display.markdown(
-            `Run was not started because it is within the ${COOLDOWN_DAYS}-day cooldown window. Next allowed at **${result.nextAllowedAt?.toISOString()}**.`,
-          );
-          await ctx.redirect({ route: "subsCron" });
-          return;
-        }
+
+        // Record cooldown only after we've successfully scheduled subscriptions.
+        const now = new Date();
+        await recordCooldownRun({
+          lastRunAt: now,
+          updatedSubscriptions: (result as any).updatedSubscriptions ?? 0,
+        });
 
         const lambda = new LambdaClient();
         const invoked = await lambda.send(
@@ -171,9 +190,7 @@ export const CronSubs = createSubscriptionsPage({
             { label: "Processor invoked", value: invoked.StatusCode?.toString() ?? "unknown" },
             {
               label: "Next allowed",
-              value:
-                result.nextAllowedAt?.toISOString() ??
-                DateTime.utc().plus({ days: COOLDOWN_DAYS }).toISO(),
+              value: DateTime.fromJSDate(now).toUTC().plus({ days: COOLDOWN_DAYS }).toISO(),
             },
           ],
         });
