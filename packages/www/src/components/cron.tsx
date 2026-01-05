@@ -72,7 +72,7 @@ export default function Cron(props: CronProps) {
             <div class="w-1/2 self-end mr-2 [&>p]:leading-[150%] [&>p]:tracking-[0] [&>p]:whitespace-nowrap">
               <p>and do it'll be worth every</p>
               <p>penny of the very reasonable</p>
-              <p>price of $35 per month.</p>
+              <p>price of $30 per month.</p>
             </div>
             <p>And if you disagree, then while we won't be able to sleep</p>
             <p>for a week, you on the other hand can easily cancel your</p>
