@@ -26,6 +26,7 @@ var subscriptionCommands = []footerCommand{
 
 // footer commands for subscription detail view
 var subscriptionDetailCommands = []footerCommand{
+	{key: "x/del", value: "cancel subscription"},
 	{key: "esc", value: "back to subscriptions"},
 }
 
@@ -84,9 +85,49 @@ func (m model) SubscriptionsUpdate(msg tea.Msg) (model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			switch msg.String() {
-			case "esc", "q", "backspace":
+			case "n", "esc":
+				// If deletion is pending, cancel it
+				if m.state.subscriptions.deleting != nil {
+					m.state.subscriptions.deleting = nil
+					return m, nil
+				}
+				// Otherwise exit detail view
 				m.state.footer.commands = subscriptionCommands
 				m.state.subscriptions.viewing = false
+				return m, nil
+			case "q", "backspace":
+				// Exit detail view (but don't cancel deletion with these)
+				if m.state.subscriptions.deleting == nil {
+					m.state.footer.commands = subscriptionCommands
+					m.state.subscriptions.viewing = false
+				}
+				return m, nil
+			case "delete", "d", "x":
+				if m.state.subscriptions.deleting == nil && len(m.subscriptions) > 0 {
+					m.state.subscriptions.deleting = &m.state.subscriptions.selected
+				}
+				return m, nil
+			case "y":
+				if m.state.subscriptions.deleting != nil {
+					m.state.subscriptions.deleting = nil
+					_, err := m.client.Subscription.Delete(m.context, m.subscriptions[m.state.subscriptions.selected].ID)
+					if err != nil {
+						return m, func() tea.Msg { return err }
+					}
+					// Exit detail view and go back to list
+					m.state.subscriptions.viewing = false
+					m.state.footer.commands = subscriptionCommands
+					if len(m.subscriptions)-1 == 0 {
+						m.state.account.focused = false
+					}
+					return m, func() tea.Msg {
+						subscriptions, err := m.client.Subscription.List(m.context)
+						if err != nil {
+							return err
+						}
+						return subscriptions.Data
+					}
+				}
 				return m, nil
 			}
 			// Pass other keys to viewport for scrolling
@@ -121,7 +162,7 @@ func (m model) SubscriptionsUpdate(msg tea.Msg) (model, tea.Cmd) {
 				m.state.footer.commands = subscriptionDetailCommands
 			}
 			return m, nil
-		case "delete", "d", "backspace", "x":
+		case "delete", "d", "x":
 			if m.state.subscriptions.deleting == nil {
 				m.state.subscriptions.deleting = &m.state.subscriptions.selected
 			}
@@ -310,6 +351,11 @@ func (m model) SubscriptionsView(totalWidth int, focused bool) string {
 
 	// If viewing detail, show the full subscription details view
 	if m.state.subscriptions.viewing && len(m.subscriptions) > 0 {
+		// Show confirmation dialog if deletion is pending
+		if m.state.subscriptions.deleting != nil {
+			content := accent("are you sure?") + base("\n(y/n)")
+			return m.theme.Base().Width(totalWidth).Render(content)
+		}
 		sub := m.subscriptions[m.state.subscriptions.selected]
 		detailContent := m.formatSubscriptionDetail(sub)
 		return m.theme.Base().Width(totalWidth).Render(detailContent)
