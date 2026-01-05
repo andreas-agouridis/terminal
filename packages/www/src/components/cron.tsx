@@ -42,7 +42,7 @@ export default function Cron(props: CronProps) {
             out for yourself. We guarantee that whatever we ship
             and do it'll be worth every
             penny of the very reasonable
-            price of $35 per month.
+            price of $30 per month.
             And if you disagree, then while we won't be able to sleep
             for a week, you on the other hand can easily cancel your
             membership at any time and life will go on.
