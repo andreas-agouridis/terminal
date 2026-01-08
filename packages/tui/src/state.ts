@@ -6,6 +6,8 @@ import { Coffee, ProductVariantID } from "./types";
 export const keys = {
 	cart: ["cart"],
 	example: ["cart", "example"],
+	tokens: ["tokens"],
+	orders: ["orders"],
 } as const;
 
 export const runtimeAtom = Atom.runtime(TerminalService.Default);
@@ -100,3 +102,57 @@ export const setItemInCartAtom = runtimeAtom.fn(
 export const refreshCartAtom = runtimeAtom.fn(() => Effect.succeed(void 0), {
 	reactivityKeys: keys.cart,
 });
+
+// Token state
+export const tokensAtom = runtimeAtom
+	.atom(
+		Effect.gen(function* () {
+			const terminal = yield* TerminalService;
+			return yield* terminal.getTokens;
+		}),
+	)
+	.pipe(Atom.withReactivity(keys.tokens));
+
+export const selectedTokenIdxAtom = Atom.make(0);
+
+// Store the newly created token to show to user
+export const newlyCreatedTokenAtom = Atom.make<string | null>(null);
+
+export const createTokenAtom = runtimeAtom.fn(
+	(_: void, ctx) =>
+		Effect.gen(function* () {
+			const terminal = yield* TerminalService;
+			const result = yield* terminal.createToken;
+			// Store the full token so user can see/copy it
+			ctx.set(newlyCreatedTokenAtom, result.fullToken);
+			return result.token;
+		}),
+	{ reactivityKeys: keys.tokens },
+);
+
+export const deleteTokenAtom = runtimeAtom.fn(
+	(id: string, _ctx) =>
+		Effect.gen(function* () {
+			const terminal = yield* TerminalService;
+			yield* terminal.deleteToken(id);
+		}),
+	{ reactivityKeys: keys.tokens },
+);
+
+export const clearNewTokenAtom = Atom.fn((_: void, ctx) =>
+	Effect.gen(function* () {
+		ctx.set(newlyCreatedTokenAtom, null);
+	}),
+);
+
+// Orders state
+export const ordersAtom = runtimeAtom
+	.atom(
+		Effect.gen(function* () {
+			const terminal = yield* TerminalService;
+			return yield* terminal.getOrders;
+		}),
+	)
+	.pipe(Atom.withReactivity(keys.orders));
+
+export const selectedOrderIdxAtom = Atom.make(0);

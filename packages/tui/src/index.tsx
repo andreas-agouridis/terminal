@@ -5,21 +5,22 @@ import {
 	useAtomSet,
 	useAtomValue,
 } from "@effect-atom/atom-react";
-import { TextAttributes } from "@opentui/core";
-import { render, useKeyboard } from "@opentui/react";
+import { createCliRenderer, TextAttributes } from "@opentui/core";
+import { createRoot, useKeyboard } from "@opentui/react";
 import { Effect, Match, Option } from "effect";
 
 import "./components/pretty-header";
+import { AccountPage } from "./account";
 import { TerminalService } from "./api";
-import type { Section } from "./components/pretty-header";
-import { Coffee, CoffeeGroup, ProductVariantID, Cart, Page } from "./types";
 import { CartPage } from "./components/cart-page";
+import type { Section } from "./components/pretty-header";
 import {
-	moveSelectionAtom,
-	setItemInCartAtom,
 	coffeeStateAtom,
+	moveSelectionAtom,
 	refreshCartAtom,
+	setItemInCartAtom,
 } from "./state";
+import { Cart, Coffee, CoffeeGroup, Page, ProductVariantID } from "./types";
 
 function DisplayCoffeeGroup(props: {
 	group: CoffeeGroup;
@@ -205,7 +206,7 @@ function App() {
 				<text>{`Could not get cart:: ${cause}`}</text>
 			),
 			ProductListFailure: ({ cause }) => (
-				<text>{`Could not list producsts:: ${cause}`}</text>
+				<text>{`Could not list products:: ${cause}`}</text>
 			),
 		}),
 		onSuccess(state) {
@@ -228,7 +229,7 @@ function App() {
 					);
 					break;
 				case "account":
-					pageElement = <text>Account</text>;
+					pageElement = <AccountPage />;
 					break;
 			}
 
@@ -244,4 +245,6 @@ function App() {
 	});
 }
 
-render(<App />);
+// render(<App />);
+const renderer = await createCliRenderer();
+createRoot(renderer).render(<App />);
