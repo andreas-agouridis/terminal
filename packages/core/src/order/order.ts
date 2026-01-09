@@ -273,37 +273,37 @@ export namespace Order {
           productVariantTable,
           eq(orderItemTable.productVariantID, productVariantTable.id),
         )
-        .where(eq(orderTable.id, input))
+        .where(and(eq(orderTable.id, input), eq(orderTable.userID, Actor.userID())))
         .then((rows): Info | undefined =>
           rows.length === 0
             ? undefined
             : {
-                id: rows[0]!.order.id,
-                shipping: rows[0]!.order.shippingAddress,
-                created: rows[0]!.order.timeCreated,
-                amount: {
-                  shipping: rows[0]!.order.shippingAmount,
-                  subtotal: rows.reduce(
-                    (acc, row) => acc + row.order_item.amount,
-                    0,
-                  ),
-                },
-                tracking: {
-                  number: rows[0]!.order.trackingNumber || undefined,
-                  url: rows[0]!.order.trackingURL || undefined,
-                  status: rows[0]!.order.trackingStatus || undefined,
-                  statusDetails:
-                    rows[0]!.order.trackingStatusDetails || undefined,
-                  statusUpdatedAt:
-                    rows[0]!.order.trackingStatusUpdatedAt || undefined,
-                },
-                items: rows.map((row) => ({
-                  id: row.order_item.id,
-                  amount: row.order_item.amount,
-                  quantity: row.order_item.quantity,
-                  productVariantID: row.product_variant?.id,
-                })),
+              id: rows[0]!.order.id,
+              shipping: rows[0]!.order.shippingAddress,
+              created: rows[0]!.order.timeCreated,
+              amount: {
+                shipping: rows[0]!.order.shippingAmount,
+                subtotal: rows.reduce(
+                  (acc, row) => acc + row.order_item.amount,
+                  0,
+                ),
               },
+              tracking: {
+                number: rows[0]!.order.trackingNumber || undefined,
+                url: rows[0]!.order.trackingURL || undefined,
+                status: rows[0]!.order.trackingStatus || undefined,
+                statusDetails:
+                  rows[0]!.order.trackingStatusDetails || undefined,
+                statusUpdatedAt:
+                  rows[0]!.order.trackingStatusUpdatedAt || undefined,
+              },
+              items: rows.map((row) => ({
+                id: row.order_item.id,
+                amount: row.order_item.amount,
+                quantity: row.order_item.quantity,
+                productVariantID: row.product_variant?.id,
+              })),
+            },
         ),
     ),
   );
