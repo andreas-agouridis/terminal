@@ -8,8 +8,9 @@ import {
 } from "./util";
 import { Examples } from "@terminal/core/examples";
 import { Subscription } from "@terminal/core/subscription/subscription";
+import { ErrorCodes } from "@terminal/core/error";
 
-const { test, validateOpenAPIRoute } = setupApiTest();
+const { test, validateOpenAPIRoute, post, expectError } = setupApiTest();
 
 describe("subscription", () => {
   test("GET /subscription", async () => {
@@ -66,6 +67,36 @@ describe("subscription", () => {
           sub.cardID === cardID,
       ),
     ).toBe(true);
+  });
+
+  test("POST /subscription rejects negative quantity", async () => {
+    const productVariantID = await getTestProductVariantID();
+    const addressID = await getTestAddressID();
+    const cardID = await getTestCardID();
+
+    const res = await post("/subscription", {
+      addressID,
+      cardID,
+      productVariantID,
+      quantity: -1,
+      schedule: Examples.Subscription.schedule,
+    });
+    await expectError(res, 400, ErrorCodes.Validation.INVALID_PARAMETER);
+  });
+
+  test("POST /subscription rejects zero quantity", async () => {
+    const productVariantID = await getTestProductVariantID();
+    const addressID = await getTestAddressID();
+    const cardID = await getTestCardID();
+
+    const res = await post("/subscription", {
+      addressID,
+      cardID,
+      productVariantID,
+      quantity: 0,
+      schedule: Examples.Subscription.schedule,
+    });
+    await expectError(res, 400, ErrorCodes.Validation.INVALID_PARAMETER);
   });
 
   test("PUT /subscription/:id", async () => {

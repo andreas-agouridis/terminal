@@ -30,6 +30,15 @@ describe("cart", async () => {
     expect(cart.items[0]?.quantity).toEqual(quantity);
   });
 
+  withTestUser("setItem rejects negative quantity", async () => {
+    await expect(
+      Cart.setItem({
+        productVariantID: variantID,
+        quantity: -1,
+      }),
+    ).rejects.toBeDefined();
+  });
+
   withTestUser("flow", async () => {
     await Cart.setItem({
       productVariantID: variantID,

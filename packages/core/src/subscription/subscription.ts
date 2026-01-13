@@ -40,7 +40,7 @@ export namespace Subscription {
         description: "Price of the subscription in cents (USD).",
         example: Examples.Subscription.price,
       }),
-      quantity: z.number().int().openapi({
+      quantity: z.number().int().min(1).openapi({
         description: "Quantity of the subscription.",
         example: Examples.Subscription.quantity,
       }),
@@ -137,9 +137,9 @@ export namespace Subscription {
             id,
             timeNext: input.schedule
               ? next({
-                  schedule: input.schedule,
-                  last: new Date(),
-                })
+                schedule: input.schedule,
+                last: new Date(),
+              })
               : undefined,
             userID: Actor.userID(),
             productVariantID: input.productVariantID,

@@ -4,7 +4,7 @@ import { fn } from "../util/fn";
 import { cartItemTable, cartTable } from "./cart.sql";
 import { createID } from "../util/id";
 import { productTable, productVariantTable } from "../product/product.sql";
-import { and, eq, getTableColumns, sql, sum } from "drizzle-orm";
+import { and, eq, getTableColumns, gt, sql, sum } from "drizzle-orm";
 import { Actor } from "../actor";
 import { cardTable } from "../card/card.sql";
 import { ErrorCodes, VisibleError } from "../error";
@@ -169,7 +169,12 @@ export namespace Cart {
           productVariantTable,
           eq(cartItemTable.productVariantID, productVariantTable.id),
         )
-        .where(eq(cartItemTable.userID, Actor.userID()))
+        .where(
+          and(
+            eq(cartItemTable.userID, Actor.userID()),
+            gt(cartItemTable.quantity, 0),
+          ),
+        )
         .then((rows): Item[] =>
           rows.map((row) => ({
             id: row.cartItem.id,
@@ -201,7 +206,12 @@ export namespace Cart {
           eq(productVariantTable.id, cartItemTable.productVariantID),
         )
         .innerJoin(addressTable, eq(addressTable.id, addressID))
-        .where(eq(cartItemTable.userID, Actor.userID()))
+        .where(
+          and(
+            eq(cartItemTable.userID, Actor.userID()),
+            gt(cartItemTable.quantity, 0),
+          ),
+        )
         .then((rows) => rows[0]);
       if (!response) {
         throw new VisibleError(

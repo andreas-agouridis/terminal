@@ -313,6 +313,7 @@ export function setupApiTest() {
   return {
     get,
     post,
+    put,
     del,
     noAuth,
     test,

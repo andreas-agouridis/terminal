@@ -7,8 +7,9 @@ import {
 } from "./util";
 import { Examples } from "@terminal/core/examples";
 import { Cart } from "@terminal/core/cart/index";
+import { ErrorCodes } from "@terminal/core/error";
 
-const { test, validateOpenAPIRoute } = setupApiTest();
+const { test, validateOpenAPIRoute, put, expectError } = setupApiTest();
 
 describe("cart", () => {
   test("GET /cart", async () => {
@@ -46,6 +47,12 @@ describe("cart", () => {
           item.quantity === Examples.CartItem.quantity,
       ),
     ).toBe(true);
+  });
+
+  test("PUT /cart/item rejects negative quantity", async () => {
+    const productVariantID = await getTestProductVariantID();
+    const res = await put("/cart/item", { productVariantID, quantity: -1 });
+    await expectError(res, 400, ErrorCodes.Validation.INVALID_PARAMETER);
   });
 
   test("PUT /cart/address", async () => {

@@ -61,7 +61,7 @@ export namespace Order {
         description: "Amount of the item in the order, in cents (USD).",
         example: Examples.OrderItem.amount,
       }),
-      quantity: z.number().int().min(0).openapi({
+      quantity: z.number().int().min(1).openapi({
         description: "Quantity of the item in the order.",
         example: Examples.OrderItem.quantity,
       }),
@@ -193,7 +193,7 @@ export namespace Order {
    * Used by Order.create and Order.createInternal to get accurate weights for shipping.
    */
   export const calculateTotalWeight = fn(
-    z.record(z.number().int()),
+    z.record(z.number().int().min(1)),
     async (variants) => {
       if (Object.keys(variants).length === 0) return 0;
       const rows = await useTransaction(async (tx) =>
@@ -335,10 +335,18 @@ export namespace Order {
         ErrorCodes.Validation.MISSING_REQUIRED_FIELD,
         "No card added to cart.",
       );
+    const validItems = items.filter((item) => item.quantity > 0);
+    if (validItems.length === 0) {
+      throw new VisibleError(
+        "validation",
+        ErrorCodes.Validation.INVALID_PARAMETER,
+        "No items in cart.",
+      );
+    }
     const orderID = await create({
       addressID: cart.addressID,
       cardID: cart.cardID,
-      variants: items.reduce(
+      variants: validItems.reduce(
         (acc, item) => {
           acc[item.productVariantID] = item.quantity;
           return acc;
@@ -356,7 +364,7 @@ export namespace Order {
     z.object({
       cardID: z.string(),
       addressID: z.string(),
-      variants: z.record(z.number().int()),
+      variants: z.record(z.number().int().min(1)),
       prices: z.record(z.number().int()).optional(), // price overrides, used for subscriptions
     }),
     async (input) => {
@@ -548,7 +556,7 @@ export namespace Order {
   export const createInternal = fn(
     z.object({
       email: z.string().email(),
-      items: z.record(z.number().int()),
+      items: z.record(z.number().int().min(1)),
       address: AddressInner,
     }),
     async (input) => {

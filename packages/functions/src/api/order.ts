@@ -127,7 +127,7 @@ export namespace OrderApi {
         "json",
         z
           .object({
-            variants: z.record(z.number().int()).openapi({
+            variants: z.record(z.number().int().min(1)).openapi({
               description:
                 "Product variants to include in the order, along with their quantities.",
               example: {
