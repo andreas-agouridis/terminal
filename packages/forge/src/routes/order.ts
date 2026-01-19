@@ -1,6 +1,10 @@
-import { Action, Layout, Page, ctx, io } from "@forgeapp/sdk";
-import { useTransaction } from "@terminal/core/drizzle/transaction";
-import { entries, groupBy, map, pipe } from "remeda";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Action, ctx, io, Layout, Page } from "@forgeapp/sdk";
 import {
   and,
   count,
@@ -13,25 +17,21 @@ import {
   sql,
   sum,
 } from "@terminal/core/drizzle/index";
-import { orderItemTable, orderTable } from "@terminal/core/order/order.sql";
+import { useTransaction } from "@terminal/core/drizzle/transaction";
 import { Order as OrderM } from "@terminal/core/order/order";
-import { PDFDocument } from "pdf-lib";
-import { Resource } from "sst";
-import { bus } from "sst/aws/bus";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { orderItemTable, orderTable } from "@terminal/core/order/order.sql";
 import { Product } from "@terminal/core/product/index";
 import {
   productTable,
   productVariantTable,
 } from "@terminal/core/product/product.sql";
 import { Shippo } from "@terminal/core/shippo/index";
-import * as queries from "../queries";
+import { PDFDocument } from "pdf-lib";
+import { entries, groupBy, map, pipe } from "remeda";
+import { Resource } from "sst";
+import { bus } from "sst/aws/bus";
 import * as formatters from "../formatters";
+import * as queries from "../queries";
 
 const s3 = new S3Client();
 
@@ -127,12 +127,12 @@ export const Order = new Page({
                 label: row.address?.name || "N/A",
               }),
             },
-			{
-			  label: "email",
-			  renderCell: (row) => ({
-				label: row.email || "N/A",
-			  }),
-			},
+            {
+              label: "email",
+              renderCell: (row) => ({
+                label: row.email || "N/A",
+              }),
+            },
             "created",
             "status",
             "fulfiller",
@@ -302,23 +302,16 @@ export const Order = new Page({
         }
         if (total === 0) return;
         console.log(items);
-        const [
-          email,
-          name,
-          street1,
-          street2,
-          city,
-          province,
-          zip,
-        ] = await io.group([
-          io.input.text("Email"),
-          io.input.text("Name"),
-          io.input.text("Street 1"),
-          io.input.text("Street 2").optional(),
-          io.input.text("City"),
-          io.input.text("State / Province"),
-          io.input.text("Zip"),
-        ]);
+        const [email, name, street1, street2, city, province, zip] =
+          await io.group([
+            io.input.text("Email"),
+            io.input.text("Name"),
+            io.input.text("Street 1"),
+            io.input.text("Street 2").optional(),
+            io.input.text("City"),
+            io.input.text("State / Province"),
+            io.input.text("Zip"),
+          ]);
 
         await OrderM.createInternal({
           email,
@@ -477,7 +470,7 @@ export const Order = new Page({
 
             if (order.stripePaymentIntentID) {
               await io.display.markdown(
-                `Cannot delete order **${orderID}** - it has a Stripe payment intent associated with it.`,
+                `Cannot delete order **${orderID}** - it has a Stripe payment intent.`,
               );
               return;
             }
@@ -489,7 +482,10 @@ export const Order = new Page({
                 { label: "Order ID", value: order.id },
                 { label: "Email", value: order.email || "N/A" },
                 { label: "Name", value: order.address?.name || "N/A" },
-                { label: "Tracking Status", value: order.trackingStatus || "None" },
+                {
+                  label: "Tracking Status",
+                  value: order.trackingStatus || "None",
+                },
               ],
             });
 
@@ -507,7 +503,9 @@ export const Order = new Page({
                 tx.delete(orderTable).where(eq(orderTable.id, orderID)),
               );
 
-              console.log(`[Order Delete] Successfully deleted order ${orderID}`);
+              console.log(
+                `[Order Delete] Successfully deleted order ${orderID}`,
+              );
             }
 
             await ctx.redirect({ route: "order/noStatus" });
