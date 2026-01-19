@@ -13,6 +13,7 @@
     "@aws-sdk/s3-request-presigner": "3.606.0",
     "@forgeapp/sdk": "0.2.0",
     "@terminal/core": "workspace:",
+    "luxon": "3.7.2",
     "pdf-lib": "1.17.1",
     "remeda": "*",
     "sst": "3.17.6",
