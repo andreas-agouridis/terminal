@@ -23,10 +23,15 @@ export function formatTotalAmount(
 /**
  * Format subscription schedule
  */
-export function formatSchedule(schedule: SubscriptionSchedule | null | undefined): string {
+type ScheduleLike = SubscriptionSchedule | { type: "lifetime" } | null | undefined;
+
+export function formatSchedule(schedule: ScheduleLike): string {
   if (!schedule) return "N/A";
   if (schedule.type === "weekly") {
     return `every ${schedule.interval} weeks`;
+  }
+  if (schedule.type === "lifetime") {
+    return "lifetime";
   }
   return schedule.type;
 }

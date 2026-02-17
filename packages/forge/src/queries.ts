@@ -2,6 +2,7 @@ import { useTransaction } from "@terminal/core/drizzle/transaction";
 import { eq, desc, sql, sum, isNull, and, SQL, like, or, isNotNull } from "@terminal/core/drizzle/index";
 import { orderTable, orderItemTable } from "@terminal/core/order/order.sql";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
+import { lifetimeCronSubscriptionTable } from "@terminal/core/subscription/lifetime-cron.sql";
 import { addressTable } from "@terminal/core/address/address.sql";
 import { cardTable } from "@terminal/core/card/card.sql";
 import { cartTable, cartItemTable } from "@terminal/core/cart/cart.sql";
@@ -12,6 +13,39 @@ type PaginationInput = {
   offset: number;
   pageSize: number;
 };
+
+type CronSubscriptionRow = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  address: any;
+  product: string;
+  price: number;
+  created: Date;
+  schedule: { type: string } | null;
+  next: Date | null;
+  type: "paid" | "lifetime";
+};
+
+function buildCronQueryTerm(queryTerm?: string) {
+  return queryTerm
+    ? or(
+        like(productTable.name, "%" + queryTerm + "%"),
+        like(userTable.email, "%" + queryTerm + "%"),
+        like(userTable.name, "%" + queryTerm + "%"),
+      )
+    : sql`true`;
+}
+
+function mergeCronRows(
+  paid: CronSubscriptionRow[],
+  lifetime: CronSubscriptionRow[],
+  pagination: PaginationInput,
+) {
+  return [...paid, ...lifetime]
+    .sort((a, b) => (a.id < b.id ? 1 : -1))
+    .slice(pagination.offset, pagination.offset + pagination.pageSize);
+}
 
 /**
  * Get orders for a user with calculated total amount
@@ -258,6 +292,218 @@ export async function getAllSubscriptions(
 }
 
 /**
+ * Get cron subscriptions merged with lifetime cron subscriptions.
+ */
+export async function getCronSubscriptionsMerged(
+  pagination: PaginationInput,
+  productFilter: SQL,
+  queryTerm?: string,
+) {
+  const limit = pagination.offset + pagination.pageSize;
+  const queryTermClause = buildCronQueryTerm(queryTerm);
+
+  const paid = await useTransaction(async (tx) =>
+    tx
+      .select({
+        id: subscriptionTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        address: addressTable.address,
+        product: productTable.name,
+        price: subscriptionTable.price,
+        created: subscriptionTable.timeCreated,
+        schedule: subscriptionTable.schedule,
+        next: subscriptionTable.timeNext,
+      })
+      .from(subscriptionTable)
+      .innerJoin(
+        userTable,
+        eq(subscriptionTable.userID, userTable.id),
+      )
+      .innerJoin(
+        addressTable,
+        eq(subscriptionTable.addressID, addressTable.id),
+      )
+      .innerJoin(
+        productVariantTable,
+        eq(subscriptionTable.productVariantID, productVariantTable.id),
+      )
+      .innerJoin(
+        productTable,
+        eq(productVariantTable.productID, productTable.id),
+      )
+      .where(
+        and(
+          isNull(subscriptionTable.timeDeleted),
+          productFilter,
+          queryTermClause,
+        ),
+      )
+      .orderBy(desc(subscriptionTable.id))
+      .limit(limit),
+  );
+
+  const lifetime = await useTransaction(async (tx) =>
+    tx
+      .select({
+        id: lifetimeCronSubscriptionTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        address: addressTable.address,
+        product: productTable.name,
+        price: sql<number>`0`,
+        created: lifetimeCronSubscriptionTable.timeCreated,
+        next: lifetimeCronSubscriptionTable.timeNext,
+      })
+      .from(lifetimeCronSubscriptionTable)
+      .innerJoin(userTable, eq(lifetimeCronSubscriptionTable.userID, userTable.id))
+      .innerJoin(
+        addressTable,
+        eq(lifetimeCronSubscriptionTable.addressID, addressTable.id),
+      )
+      .innerJoin(
+        productVariantTable,
+        eq(lifetimeCronSubscriptionTable.productVariantID, productVariantTable.id),
+      )
+      .innerJoin(
+        productTable,
+        eq(productVariantTable.productID, productTable.id),
+      )
+      .where(
+        and(
+          isNull(lifetimeCronSubscriptionTable.timeDeleted),
+          productFilter,
+          queryTermClause,
+        ),
+      )
+      .orderBy(desc(lifetimeCronSubscriptionTable.id))
+      .limit(limit),
+  );
+
+  const paidRows: CronSubscriptionRow[] = paid.map((row) => ({
+    ...row,
+    type: "paid",
+  }));
+
+  const lifetimeRows: CronSubscriptionRow[] = lifetime.map((row) => ({
+    ...row,
+    schedule: { type: "lifetime" },
+    type: "lifetime",
+  }));
+
+  return {
+    data: mergeCronRows(paidRows, lifetimeRows, pagination),
+  };
+}
+
+/**
+ * Get cron subscriptions with NULL next date (paid + lifetime).
+ */
+export async function getCronSchedulePreview(
+  pagination: PaginationInput,
+  productFilter: SQL,
+  queryTerm?: string,
+) {
+  const limit = pagination.offset + pagination.pageSize;
+  const queryTermClause = buildCronQueryTerm(queryTerm);
+
+  const paid = await useTransaction(async (tx) =>
+    tx
+      .select({
+        id: subscriptionTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        address: addressTable.address,
+        product: productTable.name,
+        price: subscriptionTable.price,
+        created: subscriptionTable.timeCreated,
+        schedule: subscriptionTable.schedule,
+        next: subscriptionTable.timeNext,
+      })
+      .from(subscriptionTable)
+      .innerJoin(
+        userTable,
+        eq(subscriptionTable.userID, userTable.id),
+      )
+      .innerJoin(
+        addressTable,
+        eq(subscriptionTable.addressID, addressTable.id),
+      )
+      .innerJoin(
+        productVariantTable,
+        eq(subscriptionTable.productVariantID, productVariantTable.id),
+      )
+      .innerJoin(
+        productTable,
+        eq(productVariantTable.productID, productTable.id),
+      )
+      .where(
+        and(
+          isNull(subscriptionTable.timeDeleted),
+          isNull(subscriptionTable.timeNext),
+          productFilter,
+          queryTermClause,
+        ),
+      )
+      .orderBy(desc(subscriptionTable.id))
+      .limit(limit),
+  );
+
+  const lifetime = await useTransaction(async (tx) =>
+    tx
+      .select({
+        id: lifetimeCronSubscriptionTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        address: addressTable.address,
+        product: productTable.name,
+        price: sql<number>`0`,
+        created: lifetimeCronSubscriptionTable.timeCreated,
+        next: lifetimeCronSubscriptionTable.timeNext,
+      })
+      .from(lifetimeCronSubscriptionTable)
+      .innerJoin(userTable, eq(lifetimeCronSubscriptionTable.userID, userTable.id))
+      .innerJoin(
+        addressTable,
+        eq(lifetimeCronSubscriptionTable.addressID, addressTable.id),
+      )
+      .innerJoin(
+        productVariantTable,
+        eq(lifetimeCronSubscriptionTable.productVariantID, productVariantTable.id),
+      )
+      .innerJoin(
+        productTable,
+        eq(productVariantTable.productID, productTable.id),
+      )
+      .where(
+        and(
+          isNull(lifetimeCronSubscriptionTable.timeDeleted),
+          isNull(lifetimeCronSubscriptionTable.timeNext),
+          productFilter,
+          queryTermClause,
+        ),
+      )
+      .orderBy(desc(lifetimeCronSubscriptionTable.id))
+      .limit(limit),
+  );
+
+  const paidRows: CronSubscriptionRow[] = paid.map((row) => ({
+    ...row,
+    type: "paid",
+  }));
+
+  const lifetimeRows: CronSubscriptionRow[] = lifetime.map((row) => ({
+    ...row,
+    schedule: { type: "lifetime" },
+    type: "lifetime",
+  }));
+
+  return {
+    data: mergeCronRows(paidRows, lifetimeRows, pagination),
+  };
+}
+
+/**
  * Get addresses for a user
  */
 export async function getUserAddresses(userID: string, pagination: PaginationInput) {
@@ -335,6 +581,41 @@ export async function getUser(userID: string) {
       .where(eq(userTable.id, userID))
       .limit(1)
       .then((rows) => rows[0]),
+  );
+}
+
+/**
+ * Get user by email
+ */
+export async function getUserByEmail(email: string) {
+  return useTransaction(async (tx) =>
+    tx
+      .select()
+      .from(userTable)
+      .where(eq(userTable.email, email))
+      .limit(1)
+      .then((rows) => rows[0]),
+  );
+}
+
+/**
+ * Get cron product variants
+ */
+export async function getCronProductVariants() {
+  return useTransaction(async (tx) =>
+    tx
+      .select({
+        id: productVariantTable.id,
+        name: productVariantTable.name,
+        productName: productTable.name,
+      })
+      .from(productVariantTable)
+      .innerJoin(
+        productTable,
+        eq(productVariantTable.productID, productTable.id),
+      )
+      .where(eq(productTable.name, "cron"))
+      .orderBy(desc(productVariantTable.id)),
   );
 }
 

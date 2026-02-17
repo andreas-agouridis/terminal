@@ -548,6 +548,133 @@ export namespace Order {
   );
 
   /**
+   * Create a comped order with $0 items and shipping.
+   * Used for lifetime cron subscriptions where no charge is made.
+   */
+  export const createComped = fn(
+    z.object({
+      addressID: z.string(),
+      variants: z.record(z.number().int().min(1)),
+    }),
+    async (input) => {
+      Actor.assert("system");
+      const userID = Actor.userID();
+      if (Object.keys(input.variants).length === 0) {
+        throw new VisibleError(
+          "validation",
+          ErrorCodes.Validation.INVALID_PARAMETER,
+          "No items in order",
+        );
+      }
+
+      const match = await useTransaction(async (tx) =>
+        tx
+          .select({
+            shipping: addressTable.address,
+            email: userTable.email,
+          })
+          .from(userTable)
+          .innerJoin(addressTable, eq(addressTable.id, input.addressID))
+          .where(eq(userTable.id, userID))
+          .then((rows) => rows[0]),
+      );
+      if (!match)
+        throw new VisibleError(
+          "validation",
+          ErrorCodes.Validation.INVALID_PARAMETER,
+          "Address not found.",
+        );
+
+      const items = await useTransaction(async (tx) =>
+        tx
+          .select({
+            tags: productTable.tags,
+            id: productVariantTable.id,
+            productName: productTable.name,
+            weight: productVariantTable.weight,
+          })
+          .from(productVariantTable)
+          .where(inArray(productVariantTable.id, Object.keys(input.variants)))
+          .innerJoin(
+            productTable,
+            eq(productVariantTable.productID, productTable.id),
+          )
+          .then((rows) =>
+            rows.map((row) => ({
+              id: row.id,
+              productName: row.productName,
+              tags: row.tags || {},
+              quantity: input.variants[row.id] ?? 0,
+              weight: row.weight * (input.variants[row.id] ?? 0),
+            })),
+          ),
+      );
+      if (items.length !== Object.keys(input.variants).length)
+        throw new VisibleError(
+          "validation",
+          ErrorCodes.Validation.INVALID_PARAMETER,
+          "Product variant not found.",
+        );
+      for (const item of items) {
+        if (item.productName !== "cron")
+          throw new VisibleError(
+            "validation",
+            ErrorCodes.Validation.INVALID_PARAMETER,
+            "Comped orders are only allowed for cron products.",
+          );
+      }
+
+      const filterCtx = {
+        ...ProductFilter.use(),
+        region: undefined,
+        country: match.shipping.country,
+      };
+      for (const item of items) {
+        if (!ProductFilter.run(filterCtx, item.tags || {}))
+          throw new VisibleError(
+            "validation",
+            ErrorCodes.Validation.INVALID_PARAMETER,
+            "This product cannot be purchased.",
+          );
+      }
+
+      const shipping = await Shipping.calculate(0, match.shipping);
+      if (!shipping)
+        throw new VisibleError(
+          "validation",
+          ErrorCodes.Validation.INVALID_PARAMETER,
+          "Cannot ship to this address",
+        );
+
+      const orderID = createID("order");
+      await createTransaction(async (tx) => {
+        await tx.insert(orderTable).values({
+          id: orderID,
+          email: match.email,
+          fulfiller: shipping.fulfiller,
+          shippingAmount: 0,
+          shippingAddress: match.shipping,
+          userID,
+        });
+
+        for (const item of items) {
+          await tx.insert(orderItemTable).values({
+            id: createID("cartItem"),
+            amount: 0,
+            productVariantID: item.id,
+            quantity: item.quantity,
+            orderID,
+          });
+        }
+
+        await afterTx(() => bus.publish(Resource.Bus, Event.Created, { orderID }));
+      });
+
+      return orderID;
+    },
+  );
+
+  /**
    * Create an internal/admin order (e.g., via Forge).
    * NOTE: This intentionally sets shippingAmount and item amounts to $0 since these
    * are internal/promo orders. However, we still need accurate weight for Shippo

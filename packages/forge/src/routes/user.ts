@@ -3,6 +3,7 @@ import * as queries from "../queries";
 import * as formatters from "../formatters";
 import { Product } from "@terminal/core/product/index";
 import { Order as OrderM } from "@terminal/core/order/order";
+import { User as UserM } from "@terminal/core/user/index";
 
 export const User = new Page({
   name: "User",
@@ -17,6 +18,12 @@ export const User = new Page({
     // }));
     return new Layout({
       title: "User",
+      menuItems: [
+        {
+          label: "Create User",
+          route: "user/create",
+        },
+      ],
       children: [
         // io.display.object("Domains", domains),
         io.display.table("", {
@@ -60,6 +67,56 @@ export const User = new Page({
     });
   },
   routes: {
+    create: new Action({
+      name: "Create User",
+      handler: async () => {
+        const [emailInput, nameInput] = await io.group([
+          io.input.text("Email"),
+          io.input.text("Name"),
+        ]);
+
+        const email = emailInput.trim().toLowerCase();
+        const name = nameInput.trim();
+        if (!email) {
+          throw new Error("Email is required");
+        }
+        if (!name) {
+          throw new Error("Name is required");
+        }
+
+        const existingUser = await queries.getUserByEmail(email);
+        if (existingUser) {
+          if (existingUser.name !== name) {
+            await UserM.update({
+              id: existingUser.id,
+              email,
+              name,
+            });
+          }
+          await ctx.redirect({
+            route: "userProfile",
+            params: {
+              userID: existingUser.id,
+            },
+          });
+          return;
+        }
+
+        const userID = await UserM.create({ email });
+        await UserM.update({
+          id: userID,
+          email,
+          name,
+        });
+
+        await ctx.redirect({
+          route: "userProfile",
+          params: {
+            userID,
+          },
+        });
+      },
+    }),
     createOrder: new Action({
       name: "Create Order",
       handler: async () => {
