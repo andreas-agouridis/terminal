@@ -5,13 +5,16 @@ import {
   and,
   count,
   eq,
+  gte,
   inArray,
   isNull,
+  not,
   sql,
 } from "@terminal/core/drizzle/index";
 import { useTransaction } from "@terminal/core/drizzle/transaction";
 import { addressTable } from "@terminal/core/address/address.sql";
 import { Actor } from "@terminal/core/actor";
+import { orderItemTable, orderTable } from "@terminal/core/order/order.sql";
 import { productTable, productVariantTable } from "@terminal/core/product/product.sql";
 import { Subscription } from "@terminal/core/subscription/subscription";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
@@ -23,6 +26,40 @@ import * as formatters from "../formatters";
 import * as queries from "../queries";
 
 const productFilter = eq(productTable.name, "cron");
+
+async function getRecentCronOrderUserIDs(tx: any) {
+  const rows = await tx
+    .select({ userID: orderTable.userID })
+    .from(orderTable)
+    .innerJoin(orderItemTable, eq(orderItemTable.orderID, orderTable.id))
+    .innerJoin(
+      productVariantTable,
+      eq(orderItemTable.productVariantID, productVariantTable.id),
+    )
+    .innerJoin(productTable, eq(productVariantTable.productID, productTable.id))
+    .where(
+      and(
+        eq(productTable.name, "cron"),
+        gte(orderTable.timeCreated, sql`DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)`),
+      ),
+    )
+    .groupBy(orderTable.userID);
+
+  return rows.flatMap((row: { userID: string | null }) =>
+    row.userID ? [row.userID] : [],
+  );
+}
+
+function excludeRecentCronOrderUsers(userIDColumn: any, recentUserIDs: string[]) {
+  if (recentUserIDs.length === 0) return sql`true`;
+  return not(inArray(userIDColumn, recentUserIDs));
+}
+
+function formatUtcDateTime(value: Date | string | null | undefined): string {
+  if (!value) return "N/A";
+  const date = value instanceof Date ? value : new Date(value);
+  return DateTime.fromJSDate(date).toUTC().toFormat("yyyy-LL-dd HH:mm:ss 'UTC'");
+}
 
 const cancel = new Action({
   name: "Cancel Subscription",
@@ -174,6 +211,8 @@ const scheduleCronNowExecute = new Action({
     }
 
     const updatedCounts = await useTransaction(async (tx) => {
+      const recentCronOrderUserIDs = await getRecentCronOrderUserIDs(tx);
+
       const rows = await tx
         .select({ id: subscriptionTable.id })
         .from(subscriptionTable)
@@ -189,6 +228,10 @@ const scheduleCronNowExecute = new Action({
           and(
             isNull(subscriptionTable.timeDeleted),
             isNull(subscriptionTable.timeNext),
+            excludeRecentCronOrderUsers(
+              subscriptionTable.userID,
+              recentCronOrderUserIDs,
+            ),
             productFilter,
           ),
         );
@@ -216,6 +259,10 @@ const scheduleCronNowExecute = new Action({
           and(
             isNull(lifetimeCronSubscriptionTable.timeDeleted),
             isNull(lifetimeCronSubscriptionTable.timeNext),
+            excludeRecentCronOrderUsers(
+              lifetimeCronSubscriptionTable.userID,
+              recentCronOrderUserIDs,
+            ),
             productFilter,
           ),
         );
@@ -231,6 +278,7 @@ const scheduleCronNowExecute = new Action({
       return {
         paid: ids.length,
         lifetime: lifetimeIds.length,
+        excluded: recentCronOrderUserIDs.length,
       };
     });
 
@@ -240,6 +288,10 @@ const scheduleCronNowExecute = new Action({
         { label: "Scheduled time (UTC)", value: scheduledAt.toISOString() },
         { label: "Paid subscriptions updated", value: updatedCounts.paid },
         { label: "Lifetime subscriptions updated", value: updatedCounts.lifetime },
+        {
+          label: "Excluded users (cron order in last 7 days)",
+          value: updatedCounts.excluded,
+        },
       ],
     });
 
@@ -257,6 +309,8 @@ const scheduleCronNow = new Page({
     const scheduledAt = DateTime.now().toUTC().startOf("day").toJSDate();
 
     const totals = await useTransaction(async (tx) => {
+      const recentCronOrderUserIDs = await getRecentCronOrderUserIDs(tx);
+
       const paid = await tx
         .select({ count: sql<number>`COUNT(*)` })
         .from(subscriptionTable)
@@ -271,6 +325,10 @@ const scheduleCronNow = new Page({
           and(
             isNull(subscriptionTable.timeDeleted),
             isNull(subscriptionTable.timeNext),
+            excludeRecentCronOrderUsers(
+              subscriptionTable.userID,
+              recentCronOrderUserIDs,
+            ),
             productFilter,
           ),
         );
@@ -292,6 +350,10 @@ const scheduleCronNow = new Page({
           and(
             isNull(lifetimeCronSubscriptionTable.timeDeleted),
             isNull(lifetimeCronSubscriptionTable.timeNext),
+            excludeRecentCronOrderUsers(
+              lifetimeCronSubscriptionTable.userID,
+              recentCronOrderUserIDs,
+            ),
             productFilter,
           ),
         );
@@ -299,6 +361,7 @@ const scheduleCronNow = new Page({
       return {
         paid: Number(paid[0]?.count ?? 0),
         lifetime: Number(lifetime[0]?.count ?? 0),
+        excluded: recentCronOrderUserIDs.length,
       };
     });
 
@@ -327,7 +390,43 @@ const scheduleCronNow = new Page({
               label: "Matching subscriptions (lifetime)",
               value: totals.lifetime.toString(),
             },
+            {
+              label: "Excluded users (cron order in last 7 days)",
+              value: totals.excluded.toString(),
+            },
           ],
+        }),
+        io.display.heading("Excluded from scheduling", { level: 3 }),
+        io.display.table("Users with cron orders in the last 7 days", {
+          getData: async (input) => {
+            const queryTerm = input.queryTerm?.trim() || undefined;
+            return queries.getRecentCronOrderUsers(
+              {
+                offset: input.offset,
+                pageSize: input.pageSize,
+              },
+              queryTerm,
+            );
+          },
+          columns: [
+            {
+              label: "userID",
+              renderCell: (row: any) => ({
+                label: row.userID,
+                route: "userProfile",
+                params: { userID: row.userID },
+              }),
+            },
+            "name",
+            "email",
+            {
+              label: "lastCronOrder",
+              renderCell: (row: any) => ({
+                label: formatUtcDateTime(row.lastCronOrder),
+              }),
+            },
+          ],
+          isSortable: false,
         }),
         io.display.table("Cron subscriptions with NULL next date", {
           getData: async (input) => {

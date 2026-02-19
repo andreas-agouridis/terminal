@@ -1,5 +1,19 @@
 import { useTransaction } from "@terminal/core/drizzle/transaction";
-import { eq, desc, sql, sum, isNull, and, SQL, like, or, isNotNull } from "@terminal/core/drizzle/index";
+import {
+  eq,
+  desc,
+  sql,
+  sum,
+  isNull,
+  and,
+  SQL,
+  like,
+  or,
+  isNotNull,
+  gte,
+  not,
+  inArray,
+} from "@terminal/core/drizzle/index";
 import { orderTable, orderItemTable } from "@terminal/core/order/order.sql";
 import { subscriptionTable } from "@terminal/core/subscription/subscription.sql";
 import { lifetimeCronSubscriptionTable } from "@terminal/core/subscription/lifetime-cron.sql";
@@ -35,6 +49,34 @@ function buildCronQueryTerm(queryTerm?: string) {
         like(userTable.name, "%" + queryTerm + "%"),
       )
     : sql`true`;
+}
+
+async function getRecentCronOrderUserIDs(tx: any) {
+  const rows = await tx
+    .select({ userID: orderTable.userID })
+    .from(orderTable)
+    .innerJoin(orderItemTable, eq(orderItemTable.orderID, orderTable.id))
+    .innerJoin(
+      productVariantTable,
+      eq(orderItemTable.productVariantID, productVariantTable.id),
+    )
+    .innerJoin(productTable, eq(productVariantTable.productID, productTable.id))
+    .where(
+      and(
+        eq(productTable.name, "cron"),
+        gte(orderTable.timeCreated, sql`DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)`),
+      ),
+    )
+    .groupBy(orderTable.userID);
+
+  return rows.flatMap((row: { userID: string | null }) =>
+    row.userID ? [row.userID] : [],
+  );
+}
+
+function excludeRecentCronOrderUsers(userIDColumn: any, recentUserIDs: string[]) {
+  if (recentUserIDs.length === 0) return sql`true`;
+  return not(inArray(userIDColumn, recentUserIDs));
 }
 
 function mergeCronRows(
@@ -406,9 +448,10 @@ export async function getCronSchedulePreview(
 ) {
   const limit = pagination.offset + pagination.pageSize;
   const queryTermClause = buildCronQueryTerm(queryTerm);
+  const { paid, lifetime } = await useTransaction(async (tx) => {
+    const recentCronOrderUserIDs = await getRecentCronOrderUserIDs(tx);
 
-  const paid = await useTransaction(async (tx) =>
-    tx
+    const paid = await tx
       .select({
         id: subscriptionTable.id,
         name: userTable.name,
@@ -441,16 +484,15 @@ export async function getCronSchedulePreview(
         and(
           isNull(subscriptionTable.timeDeleted),
           isNull(subscriptionTable.timeNext),
+          excludeRecentCronOrderUsers(subscriptionTable.userID, recentCronOrderUserIDs),
           productFilter,
           queryTermClause,
         ),
       )
       .orderBy(desc(subscriptionTable.id))
-      .limit(limit),
-  );
+      .limit(limit);
 
-  const lifetime = await useTransaction(async (tx) =>
-    tx
+    const lifetime = await tx
       .select({
         id: lifetimeCronSubscriptionTable.id,
         name: userTable.name,
@@ -479,13 +521,19 @@ export async function getCronSchedulePreview(
         and(
           isNull(lifetimeCronSubscriptionTable.timeDeleted),
           isNull(lifetimeCronSubscriptionTable.timeNext),
+          excludeRecentCronOrderUsers(
+            lifetimeCronSubscriptionTable.userID,
+            recentCronOrderUserIDs,
+          ),
           productFilter,
           queryTermClause,
         ),
       )
       .orderBy(desc(lifetimeCronSubscriptionTable.id))
-      .limit(limit),
-  );
+      .limit(limit);
+
+    return { paid, lifetime };
+  });
 
   const paidRows: CronSubscriptionRow[] = paid.map((row) => ({
     ...row,
@@ -501,6 +549,51 @@ export async function getCronSchedulePreview(
   return {
     data: mergeCronRows(paidRows, lifetimeRows, pagination),
   };
+}
+
+/**
+ * Get users excluded from cron scheduling due to recent cron orders.
+ */
+export async function getRecentCronOrderUsers(
+  pagination: PaginationInput,
+  queryTerm?: string,
+) {
+  const searchClause = queryTerm
+    ? or(
+        like(userTable.id, "%" + queryTerm + "%"),
+        like(userTable.name, "%" + queryTerm + "%"),
+        like(userTable.email, "%" + queryTerm + "%"),
+      )
+    : sql`true`;
+
+  return useTransaction(async (tx) => ({
+    data: await tx
+      .select({
+        userID: userTable.id,
+        name: userTable.name,
+        email: userTable.email,
+        lastCronOrder: sql<Date>`MAX(${orderTable.timeCreated})`,
+      })
+      .from(orderTable)
+      .innerJoin(orderItemTable, eq(orderItemTable.orderID, orderTable.id))
+      .innerJoin(
+        productVariantTable,
+        eq(orderItemTable.productVariantID, productVariantTable.id),
+      )
+      .innerJoin(productTable, eq(productVariantTable.productID, productTable.id))
+      .innerJoin(userTable, eq(orderTable.userID, userTable.id))
+      .where(
+        and(
+          eq(productTable.name, "cron"),
+          gte(orderTable.timeCreated, sql`DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)`),
+          searchClause,
+        ),
+      )
+      .groupBy(userTable.id, userTable.name, userTable.email)
+      .orderBy(desc(sql`MAX(${orderTable.timeCreated})`), desc(userTable.id))
+      .offset(pagination.offset)
+      .limit(pagination.pageSize),
+  }));
 }
 
 /**
